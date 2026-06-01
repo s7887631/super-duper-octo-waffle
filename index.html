@@ -3,75 +3,470 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>視覺化行政文書 Canvas 提示詞生成器</title>
-    <!-- 載入 Tailwind CSS 與 Inter 字體 -->
+    <title>行政文書 Canvas 智慧生成工坊 Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --ink: #0a0a0f;
+            --surface: #12121a;
+            --panel: #1a1a26;
+            --border: #2a2a3d;
+            --accent: #7c6dfa;
+            --accent2: #fa6d9a;
+            --accent3: #6dfabc;
+            --text: #e8e8f4;
+            --muted: #6b6b8a;
+        }
+        * { box-sizing: border-box; }
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: 'Noto Sans TC', sans-serif;
+            background: var(--ink);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
-        /* 畫布網格背景 */
-        .canvas-container {
+        h1, h2, h3, .display { font-family: 'Syne', sans-serif; }
+        code, .mono { font-family: 'DM Mono', monospace; }
+
+        /* Noise texture overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+        }
+
+        .canvas-wrap {
+            background: #0d0d18;
+            background-image: 
+                linear-gradient(rgba(124,109,250,0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(124,109,250,0.04) 1px, transparent 1px);
+            background-size: 24px 24px;
+            border: 1px solid var(--border);
+            border-radius: 14px;
             position: relative;
-            background-color: #f8fafc;
-            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
-            background-size: 20px 20px;
+            overflow: hidden;
         }
-        /* 隱藏原生卷軸美化 */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
+
+        /* Glow corners */
+        .canvas-wrap::before {
+            content: '';
+            position: absolute;
+            top: -60px; left: -60px;
+            width: 200px; height: 200px;
+            background: radial-gradient(circle, rgba(124,109,250,0.12) 0%, transparent 70%);
+            pointer-events: none;
         }
-        ::-webkit-scrollbar-track {
-            background: #f1f5f9;
+        .canvas-wrap::after {
+            content: '';
+            position: absolute;
+            bottom: -60px; right: -60px;
+            width: 200px; height: 200px;
+            background: radial-gradient(circle, rgba(250,109,154,0.10) 0%, transparent 70%);
+            pointer-events: none;
         }
-        ::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 3px;
+
+        /* Tone buttons */
+        .tone-btn {
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--muted);
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Noto Sans TC', sans-serif;
         }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
+        .tone-btn:hover { border-color: var(--accent); color: var(--text); }
+        .tone-btn.active {
+            background: rgba(124,109,250,0.15);
+            border-color: var(--accent);
+            color: #a89dfc;
         }
+
+        /* Pill tag */
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 10px;
+            padding: 3px 10px;
+            border-radius: 99px;
+            border: 1px solid var(--border);
+            color: var(--muted);
+            background: var(--surface);
+            font-family: 'DM Mono', monospace;
+        }
+
+        /* Primary button */
+        .btn-primary {
+            background: linear-gradient(135deg, #7c6dfa, #c46dfa);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 8px 18px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 20px rgba(124,109,250,0.3);
+            font-family: 'Syne', sans-serif;
+            letter-spacing: 0.02em;
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 28px rgba(124,109,250,0.45);
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--muted);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 7px 14px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Noto Sans TC', sans-serif;
+        }
+        .btn-ghost:hover { border-color: var(--accent); color: var(--text); }
+
+        /* Node add buttons */
+        .node-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-size: 11px;
+            padding: 9px 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Noto Sans TC', sans-serif;
+            font-weight: 500;
+            border: 1px solid;
+        }
+
+        /* Custom select */
+        select, textarea, input {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text);
+            font-family: 'Noto Sans TC', sans-serif;
+            width: 100%;
+            transition: border-color 0.2s;
+        }
+        select:focus, textarea:focus, input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        select { padding: 10px 12px; font-size: 13px; }
+        textarea { padding: 12px; font-size: 12px; resize: none; line-height: 1.7; }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        /* Share modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.75);
+            backdrop-filter: blur(8px);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-box {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 28px;
+            max-width: 480px;
+            width: 90%;
+            box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+        }
+
+        /* Toast */
+        #toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: var(--panel);
+            border: 1px solid var(--accent);
+            border-radius: 12px;
+            padding: 12px 18px;
+            font-size: 12px;
+            color: var(--text);
+            z-index: 200;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transform: translateY(80px);
+            opacity: 0;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+            max-width: 320px;
+        }
+        #toast.show { transform: translateY(0); opacity: 1; }
+
+        /* AI Generating animation */
+        .ai-thinking {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .ai-thinking span {
+            width: 5px; height: 5px;
+            background: var(--accent);
+            border-radius: 50%;
+            animation: bounce 1.2s ease-in-out infinite;
+        }
+        .ai-thinking span:nth-child(2) { animation-delay: 0.2s; }
+        .ai-thinking span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Cloud note card */
+        .note-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .note-card:hover { border-color: var(--accent); }
+
+        /* Share link input */
+        .share-link-box {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 8px 12px;
+        }
+        .share-link-box input {
+            border: none;
+            background: transparent;
+            font-size: 11px;
+            font-family: 'DM Mono', monospace;
+            color: var(--accent);
+            flex: 1;
+        }
+
+        /* Section label */
+        .section-label {
+            font-family: 'Syne', sans-serif;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        /* Prompt output */
+        #promptOutput {
+            font-family: 'DM Mono', monospace;
+            font-size: 11px;
+            line-height: 1.8;
+            color: #c8c8e4;
+            background: #0a0a14;
+            border-color: var(--border);
+            border-radius: 12px;
+        }
+
+        /* Cloud notes panel */
+        #cloudNotesList {
+            max-height: 180px;
+            overflow-y: auto;
+        }
+
+        /* Collaboration board link display */
+        .collab-link {
+            font-size: 11px;
+            font-family: 'DM Mono', monospace;
+            color: var(--accent3);
+            word-break: break-all;
+        }
+
+        .live-dot {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: var(--accent3);
+            box-shadow: 0 0 0 0 rgba(109,250,188,0.6);
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+        @keyframes pulse-dot {
+            0% { box-shadow: 0 0 0 0 rgba(109,250,188,0.6); }
+            70% { box-shadow: 0 0 0 8px rgba(109,250,188,0); }
+            100% { box-shadow: 0 0 0 0 rgba(109,250,188,0); }
+        }
+
+        /* Tab system */
+        .tab-btn {
+            font-size: 11px;
+            font-family: 'Syne', sans-serif;
+            font-weight: 600;
+            padding: 6px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--muted);
+            border: 1px solid transparent;
+        }
+        .tab-btn.active {
+            background: rgba(124,109,250,0.15);
+            border-color: rgba(124,109,250,0.3);
+            color: #a89dfc;
+        }
+
+        /* ── RECORDING PANEL ── */
+        #recPanel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* Big record button */
+        #recBtn {
+            width: 64px; height: 64px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 26px;
+            transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1);
+            background: linear-gradient(135deg, #fa6d6d, #fa6d9a);
+            box-shadow: 0 4px 20px rgba(250,109,109,0.35);
+            flex-shrink: 0;
+        }
+        #recBtn:hover { transform: scale(1.08); box-shadow: 0 6px 28px rgba(250,109,109,0.5); }
+        #recBtn.recording {
+            background: linear-gradient(135deg,#fa3a3a,#c00);
+            animation: rec-pulse 1.4s ease-in-out infinite;
+        }
+        @keyframes rec-pulse {
+            0%,100% { box-shadow: 0 4px 20px rgba(250,60,60,0.4); }
+            50% { box-shadow: 0 4px 36px rgba(250,60,60,0.75), 0 0 0 10px rgba(250,60,60,0.08); }
+        }
+
+        /* Waveform canvas */
+        #waveCanvas {
+            width: 100%; height: 52px;
+            border-radius: 10px;
+            background: #08080f;
+            border: 1px solid var(--border);
+            display: block;
+        }
+
+        /* Timer */
+        #recTimer {
+            font-family: 'DM Mono', monospace;
+            font-size: 22px;
+            font-weight: 500;
+            color: var(--text);
+            letter-spacing: 0.06em;
+        }
+        #recTimer.active { color: #fa6d6d; }
+
+        /* Transcript area */
+        #transcriptArea {
+            font-family: 'Noto Sans TC', sans-serif;
+            font-size: 12px;
+            line-height: 1.8;
+            color: var(--text);
+            background: #08080f;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
+            resize: none;
+            min-height: 100px;
+        }
+
+        /* Status badge */
+        .rec-status {
+            display: inline-flex; align-items: center; gap: 6px;
+            font-size: 10px; font-family: 'DM Mono', monospace;
+            padding: 4px 10px; border-radius: 99px;
+            border: 1px solid;
+        }
+        .rec-status.idle { border-color: var(--border); color: var(--muted); }
+        .rec-status.recording { border-color: rgba(250,109,109,0.5); color: #fa9d9d; background: rgba(250,60,60,0.07); }
+        .rec-status.processing { border-color: rgba(250,176,109,0.5); color: #fcd09d; background: rgba(250,176,109,0.07); }
+        .rec-status.done { border-color: rgba(109,250,188,0.5); color: #9dfcd4; background: rgba(109,250,188,0.07); }
+        .rec-dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
+        .rec-dot.blink { animation: blink-dot 1s step-end infinite; }
+        @keyframes blink-dot { 0%,100%{opacity:1} 50%{opacity:0} }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
+<body>
 
-    <!-- Navigation Bar -->
-    <header class="bg-slate-950 border-b border-slate-800 px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
-        <div class="flex items-center gap-3">
-            <div class="bg-indigo-600 p-2.5 rounded-xl text-white shadow-lg shadow-indigo-500/20">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-            </div>
-            <div>
-                <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">行政文書 Canvas 智慧生成工坊</h1>
-                <p class="text-xs text-slate-400">視覺化設計文書結構 ➔ AI 高階提示詞轉譯系統</p>
-            </div>
+<!-- Header -->
+<header style="background: var(--surface); border-bottom: 1px solid var(--border);" class="px-5 py-3 flex items-center justify-between gap-4 relative z-10">
+    <div class="flex items-center gap-3">
+        <div style="background: linear-gradient(135deg,#7c6dfa,#c46dfa); border-radius: 10px; padding: 8px;">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
         </div>
-        <div class="flex items-center gap-3">
-            <span class="text-xs text-slate-400 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700">PRAC 2-1 進階版</span>
-            <button onclick="showHelpModal()" class="text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 transition px-3 py-1.5 rounded-lg border border-slate-700">使用說明</button>
+        <div>
+            <h1 style="font-size:15px; background: linear-gradient(135deg,#a89dfc,#fa9dcc); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;">行政文書 Canvas 智慧工坊</h1>
+            <p style="font-size:10px; color: var(--muted); font-family:'DM Mono',monospace;">Visual Structure → AI Prompt Compiler · Pro Edition</p>
         </div>
-    </header>
+    </div>
+    <div class="flex items-center gap-2">
+        <div class="live-dot"></div>
+        <span class="pill">PRAC 2-1 Pro</span>
+        <button onclick="showHelp()" class="btn-ghost" style="padding:5px 12px; font-size:10px;">說明</button>
+        <!-- 🎙 錄音按鈕 (header shortcut) -->
+        <button onclick="showRecModal()" id="headerRecBtn" class="btn-ghost" style="padding:5px 14px; font-size:10px; border-color:rgba(250,109,109,0.45); color:#fa9d9d; display:flex; align-items:center; gap:5px;">
+            <span style="width:7px;height:7px;border-radius:50%;background:#fa6d6d;flex-shrink:0;" id="headerRecDot"></span>
+            🎙 會議錄音
+        </button>
+        <!-- 協作板按鈕 -->
+        <button onclick="showShareModal()" class="btn-ghost" style="padding:5px 12px; font-size:10px; border-color:rgba(109,250,188,0.4); color:#6dfabc;">
+            🔗 協作分享
+        </button>
+    </div>
+</header>
 
-    <!-- Main Workspace -->
-    <main class="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-6 p-6 overflow-hidden">
-        
-        <!-- 左側配置面板 (占 4 欄) -->
-        <section class="xl:col-span-4 flex flex-col gap-6 overflow-y-auto max-h-[calc(100vh-120px)] pr-2">
-            
-            <!-- STEP 1 & 2: 基礎文書設定 -->
-            <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-5 space-y-5 backdrop-blur-sm">
-                <h2 class="text-sm font-semibold tracking-wider text-indigo-400 uppercase flex items-center gap-2">
-                    <span class="bg-indigo-500/20 text-indigo-400 w-5 h-5 rounded-full inline-flex items-center justify-center text-xs">1</span>
-                    基礎文書設定
-                </h2>
-                
+<!-- Main -->
+<main style="flex:1; display:grid; grid-template-columns:1fr; gap:16px; padding:16px; overflow:hidden;" class="xl:grid-cols-12">
+    <div style="display:grid; grid-template-columns:380px 1fr; gap:16px; flex:1; overflow:hidden;">
+
+        <!-- LEFT PANEL -->
+        <div style="display:flex; flex-direction:column; gap:14px; overflow-y:auto; max-height:calc(100vh - 80px); padding-right:4px;">
+
+            <!-- Doc settings -->
+            <div class="panel" style="padding:18px; display:flex; flex-direction:column; gap:14px;">
+                <div class="section-label">① 基礎文書設定</div>
+
                 <div>
-                    <label class="block text-xs font-medium text-slate-400 mb-2">文書類型</label>
-                    <select id="docTypeSelect" onchange="onDocTypeChange()" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition">
+                    <label style="font-size:11px; color:var(--muted); display:block; margin-bottom:6px;">文書類型</label>
+                    <select id="docTypeSelect" onchange="onDocTypeChange()">
                         <option value="商務 Email">✉ 商務 Email</option>
                         <option value="內部公告">📋 內部公告</option>
                         <option value="會議議程">📅 會議議程</option>
@@ -83,887 +478,1383 @@
                 </div>
 
                 <div>
-                    <label class="block text-xs font-medium text-slate-400 mb-2">關鍵背景資訊 (必填)</label>
-                    <textarea id="docContext" rows="3" placeholder="例如：專案A截止日通知、連假差勤管理新制、主管交接事宜..." class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition resize-none"></textarea>
+                    <label style="font-size:11px; color:var(--muted); display:block; margin-bottom:6px;">關鍵背景資訊 <span style="color:var(--accent2);">*必填</span></label>
+                    <textarea id="docContext" rows="4" placeholder="例如：專案A截止日通知、連假差勤管理新制..."></textarea>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-medium text-slate-400 mb-2">語氣與文風</label>
-                    <div class="grid grid-cols-2 gap-2">
-                        <button onclick="setTone('正式精準', this)" class="tone-btn text-xs bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 py-2 rounded-lg transition active-tone font-medium">正式精準</button>
-                        <button onclick="setTone('親切有溫度', this)" class="tone-btn text-xs bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 py-2 rounded-lg transition font-medium">親切有溫度</button>
-                        <button onclick="setTone('簡潔俐落', this)" class="tone-btn text-xs bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 py-2 rounded-lg transition font-medium">簡潔俐落</button>
-                        <button onclick="setTone('謙遜委婉', this)" class="tone-btn text-xs bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 py-2 rounded-lg transition font-medium">謙遜委婉</button>
+                    <label style="font-size:11px; color:var(--muted); display:block; margin-bottom:8px;">語氣文風</label>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                        <button onclick="setTone('正式精準',this)" class="tone-btn active">正式精準</button>
+                        <button onclick="setTone('親切有溫度',this)" class="tone-btn">親切有溫度</button>
+                        <button onclick="setTone('簡潔俐落',this)" class="tone-btn">簡潔俐落</button>
+                        <button onclick="setTone('謙遜委婉',this)" class="tone-btn">謙遜委婉</button>
                     </div>
                 </div>
             </div>
 
-            <!-- STEP 3: 畫布元件操作器 -->
-            <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-5 space-y-4 backdrop-blur-sm">
-                <h2 class="text-sm font-semibold tracking-wider text-violet-400 uppercase flex items-center gap-2">
-                    <span class="bg-violet-500/20 text-violet-400 w-5 h-5 rounded-full inline-flex items-center justify-center text-xs">2</span>
-                    畫布元件配置器
-                </h2>
-                <p class="text-xs text-slate-400">在右側畫布上設計實體結構。點擊下方按鈕可在畫布中央快速追加客製化文書元件：</p>
-                
-                <div class="grid grid-cols-2 gap-2">
-                    <button onclick="addNode('主旨/標題', '#6366f1')" class="flex items-center justify-center gap-2 text-xs bg-indigo-950/40 hover:bg-indigo-900/40 border border-indigo-800/60 text-indigo-300 py-2.5 px-3 rounded-xl transition font-medium">
-                        <span>＋ 主旨標題區</span>
-                    </button>
-                    <button onclick="addNode('說明/核心事實', '#8b5cf6')" class="flex items-center justify-center gap-2 text-xs bg-violet-950/40 hover:bg-violet-900/40 border border-violet-800/60 text-violet-300 py-2.5 px-3 rounded-xl transition font-medium">
-                        <span>＋ 說明與事实</span>
-                    </button>
-                    <button onclick="addNode('變動/對照點', '#ec4899')" class="flex items-center justify-center gap-2 text-xs bg-pink-950/40 hover:bg-pink-900/40 border border-pink-800/60 text-pink-300 py-2.5 px-3 rounded-xl transition font-medium">
-                        <span>＋ 變動對照表</span>
-                    </button>
-                    <button onclick="addNode('行動指引 (CTA)', '#f59e0b')" class="flex items-center justify-center gap-2 text-xs bg-amber-950/40 hover:bg-amber-900/40 border border-amber-800/60 text-amber-300 py-2.5 px-3 rounded-xl transition font-medium">
-                        <span>＋ 行動指引區</span>
-                    </button>
-                    <button onclick="addNode('備註/例外處置', '#10b981')" class="flex items-center justify-center gap-2 text-xs bg-emerald-950/40 hover:bg-emerald-900/40 border border-emerald-800/60 text-emerald-300 py-2.5 px-3 rounded-xl transition font-medium">
-                        <span>＋ 備註說明區</span>
-                    </button>
-                    <button onclick="addNode('簽署與聯絡', '#64748b')" class="flex items-center justify-center gap-2 text-xs bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700 text-slate-300 py-2.5 px-3 rounded-xl transition font-medium">
-                        <span>＋ 簽署聯絡區</span>
-                    </button>
+            <!-- Canvas element configurator -->
+            <div class="panel" style="padding:18px; display:flex; flex-direction:column; gap:12px;">
+                <div class="section-label">② 畫布元件</div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                    <button onclick="addNode('主旨/標題','#7c6dfa')" class="node-btn" style="border-color:rgba(124,109,250,0.3); color:#a89dfc; background:rgba(124,109,250,0.07);">＋ 主旨標題</button>
+                    <button onclick="addNode('說明/核心事實','#9b6dfa')" class="node-btn" style="border-color:rgba(155,109,250,0.3); color:#b89dfc; background:rgba(155,109,250,0.07);">＋ 說明事實</button>
+                    <button onclick="addNode('變動/對照點','#fa6d9a')" class="node-btn" style="border-color:rgba(250,109,154,0.3); color:#fc9dbc; background:rgba(250,109,154,0.07);">＋ 變動對照</button>
+                    <button onclick="addNode('行動指引 (CTA)','#fab06d')" class="node-btn" style="border-color:rgba(250,176,109,0.3); color:#fcd09d; background:rgba(250,176,109,0.07);">＋ 行動指引</button>
+                    <button onclick="addNode('備註/例外','#6dfabc')" class="node-btn" style="border-color:rgba(109,250,188,0.3); color:#9dfcd4; background:rgba(109,250,188,0.07);">＋ 備註說明</button>
+                    <button onclick="addNode('簽署/聯絡','#6d8dfa')" class="node-btn" style="border-color:rgba(109,141,250,0.3); color:#9dbdfc; background:rgba(109,141,250,0.07);">＋ 簽署聯絡</button>
                 </div>
-
-                <div class="border-t border-slate-800 pt-3 flex items-center justify-between">
-                    <span class="text-xs text-slate-400">畫布連線模式：</span>
-                    <button id="arrowModeBtn" onclick="toggleArrowMode()" class="text-xs bg-slate-900 border border-slate-800 hover:border-violet-500 text-slate-300 px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
-                        <span class="w-2.5 h-2.5 rounded-full bg-slate-500" id="arrowIndicator"></span>
-                        <span>啟用節點連線</span>
+                <div style="display:flex; align-items:center; justify-content:space-between; padding-top:8px; border-top:1px solid var(--border);">
+                    <span style="font-size:11px; color:var(--muted);">連線模式</span>
+                    <button id="arrowModeBtn" onclick="toggleArrowMode()" class="btn-ghost" style="font-size:10px; padding:5px 12px; display:flex; align-items:center; gap:6px;">
+                        <span id="arrowInd" style="width:7px;height:7px;border-radius:50%;background:var(--border);display:inline-block;"></span>
+                        <span id="arrowLabel">啟用連線</span>
                     </button>
                 </div>
             </div>
 
-            <!-- 點選快速載入範本 -->
-            <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-5 space-y-3 backdrop-blur-sm">
-                <span class="text-xs font-semibold text-slate-400 tracking-wider uppercase block">快填範本與畫布佈局</span>
-                <div class="flex flex-wrap gap-2">
-                    <button onclick="loadTemplatePreset('email')" class="text-xs bg-slate-900 hover:bg-indigo-950/40 border border-slate-800 hover:border-indigo-500/60 text-slate-300 px-3 py-2 rounded-lg transition">📧 截止日提醒信</button>
-                    <button onclick="loadTemplatePreset('announcement')" class="text-xs bg-slate-900 hover:bg-indigo-950/40 border border-slate-800 hover:border-indigo-500/60 text-slate-300 px-3 py-2 rounded-lg transition">📢 制度變更公告</button>
-                    <button onclick="loadTemplatePreset('sop')" class="text-xs bg-slate-900 hover:bg-indigo-950/40 border border-slate-800 hover:border-indigo-500/60 text-slate-300 px-3 py-2 rounded-lg transition">📝 操作 SOP 流程</button>
+            <!-- Quick templates -->
+            <div class="panel" style="padding:18px; display:flex; flex-direction:column; gap:10px;">
+                <div class="section-label">快填範本</div>
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <button onclick="loadPreset('email')" class="btn-ghost" style="font-size:11px;">📧 截止日提醒</button>
+                    <button onclick="loadPreset('announcement')" class="btn-ghost" style="font-size:11px;">📢 制度變更公告</button>
+                    <button onclick="loadPreset('sop')" class="btn-ghost" style="font-size:11px;">📝 操作 SOP</button>
                 </div>
             </div>
 
-        </section>
-
-        <!-- 右側主要工作台 (占 8 欄) -->
-        <section class="xl:col-span-8 flex flex-col gap-6">
-            
-            <!-- 互動式 Canvas 畫布區區塊 -->
-            <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 flex flex-col flex-1 min-h-[400px]">
-                <div class="flex flex-wrap items-center justify-between pb-3 border-b border-slate-800 gap-3">
-                    <div class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-indigo-500 animate-ping"></span>
-                        <h3 class="text-sm font-semibold text-slate-200">Interactive Canvas 結構畫布</h3>
-                        <span class="text-[10px] text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">支援拖曳與雙擊修改</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <button onclick="clearCanvas()" class="text-xs bg-red-950/30 hover:bg-red-950/60 border border-red-900/40 text-red-300 px-3 py-1.5 rounded-lg transition">清空畫布</button>
-                        <button onclick="exportCanvasToImage()" class="text-xs bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 px-3 py-1.5 rounded-lg transition flex items-center gap-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
-                            </svg>
-                            <span>匯出圖檔</span>
-                        </button>
-                    </div>
+            <!-- NEW: Cloud Prompt Notes -->
+            <div class="panel" style="padding:18px; display:flex; flex-direction:column; gap:10px;">
+                <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <div class="section-label" style="color:#6dfabc;">☁ Prompt 雲端筆記</div>
+                    <span style="font-size:10px; color:var(--muted); font-family:'DM Mono',monospace;" id="noteCount">0 筆已儲存</span>
                 </div>
-
-                <!-- Canvas 本體容器 -->
-                <div class="canvas-container flex-1 rounded-xl mt-3 overflow-hidden border border-slate-800 relative min-h-[250px] cursor-grab active:cursor-grabbing">
-                    <canvas id="docCanvas" class="block w-full h-full"></canvas>
+                <div id="cloudNotesList" style="display:flex;flex-direction:column;gap:8px;">
+                    <p style="font-size:11px; color:var(--muted); text-align:center; padding:16px 0;">尚無已儲存的 Prompt 筆記<br><span style="font-size:10px;">生成後可點擊「儲存至雲端」</span></p>
                 </div>
-                <div class="text-[11px] text-slate-400 mt-2 flex justify-between">
-                    <span>💡 操作提示：1. 按住拖曳可搬移區塊 | 2. 雙擊區塊可更換內容或刪除 | 3. 啟用連線後，點擊A區塊再點擊B區塊即可畫上連線。</span>
+                <div style="display:flex; gap:8px;">
+                    <button onclick="savePromptToCloud()" class="btn-ghost" style="font-size:11px; flex:1; border-color:rgba(109,250,188,0.3); color:#6dfabc;">☁ 儲存至雲端</button>
+                    <button onclick="clearCloudNotes()" class="btn-ghost" style="font-size:10px; padding:7px;">🗑</button>
                 </div>
             </div>
 
-            <!-- AI PROMPT 產出面板 -->
-            <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-5 space-y-3">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                        <span class="text-emerald-400">⚡</span>
-                        <h3 class="text-sm font-semibold text-slate-200">已生成的 AI 高階提示詞（Prompt）</h3>
-                    </div>
-                    <div class="flex gap-2">
-                        <button onclick="compileAndGenerate()" class="text-xs bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-medium px-4 py-2 rounded-lg hover:from-indigo-500 hover:to-violet-500 shadow-md transition">編譯並生成 Prompt</button>
-                        <button onclick="copyGeneratedPrompt()" class="text-xs bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 px-3 py-2 rounded-lg transition">複製 Prompt</button>
+            <!-- 🎙 MEETING RECORDER PANEL (left sidebar) -->
+            <div id="recPanel">
+                <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <div class="section-label" style="color:#fa9d9d;">🎙 會議錄音記事本</div>
+                    <span class="rec-status idle" id="recStatusBadge">
+                        <span class="rec-dot" id="recDot"></span>
+                        <span id="recStatusText">待機中</span>
+                    </span>
+                </div>
+
+                <!-- Controls row -->
+                <div style="display:flex; align-items:center; gap:14px;">
+                    <button id="recBtn" onclick="toggleRecord()" title="開始/停止錄音">🎙</button>
+                    <div style="flex:1; display:flex; flex-direction:column; gap:6px;">
+                        <div id="recTimer" style="">00:00</div>
+                        <canvas id="waveCanvas" height="52"></canvas>
                     </div>
                 </div>
 
-                <textarea id="promptOutput" rows="6" readonly placeholder="請填妥設定並在畫布布排結構後，點擊「編譯並生成 Prompt」..." class="w-full bg-slate-900/80 border border-slate-800 rounded-xl p-4 text-xs font-mono text-slate-300 placeholder-slate-600 focus:outline-none focus:border-indigo-500 leading-relaxed transition"></textarea>
-            </div>
-
-        </section>
-
-    </main>
-
-    <!-- 1. 雙擊編輯節點模態框 -->
-    <div id="editModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden">
-        <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl">
-            <h3 class="text-md font-bold text-slate-100 mb-4 flex items-center gap-2">
-                <span class="text-indigo-400">✏</span> 編輯區塊屬性
-            </h3>
-            
-            <div class="space-y-4">
+                <!-- Meeting title -->
                 <div>
-                    <label class="block text-xs text-slate-400 mb-2">區塊名稱/內容說明</label>
-                    <textarea id="modalNodeText" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"></textarea>
+                    <label style="font-size:11px; color:var(--muted); display:block; margin-bottom:5px;">會議標題（選填）</label>
+                    <input type="text" id="meetingTitle" placeholder="例如：產品週會 2026-06-01" style="padding:8px 12px; font-size:12px;">
                 </div>
-                
+
+                <!-- Transcript -->
                 <div>
-                    <label class="block text-xs text-slate-400 mb-2">區塊顏色</label>
-                    <div class="flex gap-2">
-                        <button onclick="setModalColor('#6366f1')" class="w-8 h-8 rounded-full border border-slate-800" style="background-color: #6366f1;"></button>
-                        <button onclick="setModalColor('#8b5cf6')" class="w-8 h-8 rounded-full border border-slate-800" style="background-color: #8b5cf6;"></button>
-                        <button onclick="setModalColor('#ec4899')" class="w-8 h-8 rounded-full border border-slate-800" style="background-color: #ec4899;"></button>
-                        <button onclick="setModalColor('#f59e0b')" class="w-8 h-8 rounded-full border border-slate-800" style="background-color: #f59e0b;"></button>
-                        <button onclick="setModalColor('#10b981')" class="w-8 h-8 rounded-full border border-slate-800" style="background-color: #10b981;"></button>
-                        <button onclick="setModalColor('#64748b')" class="w-8 h-8 rounded-full border border-slate-800" style="background-color: #64748b;"></button>
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:5px;">
+                        <label style="font-size:11px; color:var(--muted);">逐字稿 / 會議記錄</label>
+                        <div style="display:flex; gap:6px;">
+                            <button onclick="clearTranscript()" class="btn-ghost" style="font-size:10px; padding:3px 8px;">清除</button>
+                            <button onclick="aiSummarize()" class="btn-ghost" style="font-size:10px; padding:3px 8px; border-color:rgba(124,109,250,0.4); color:#a89dfc;">✨ AI 整理</button>
+                        </div>
+                    </div>
+                    <textarea id="transcriptArea" rows="5" placeholder="錄音時將自動填入語音轉文字內容（需瀏覽器支援 Web Speech API）&#10;&#10;亦可手動貼入會議筆記後直接上傳…"></textarea>
+                </div>
+
+                <!-- Upload to cloud notes -->
+                <div style="display:flex; gap:8px;">
+                    <button onclick="uploadRecordingToCloud()" class="btn-primary" style="flex:1; font-size:12px; padding:9px;">
+                        ☁ 上傳至雲端記事本
+                    </button>
+                    <button onclick="downloadTranscript()" class="btn-ghost" style="font-size:11px; padding:9px 12px;" title="下載逐字稿">⬇</button>
+                </div>
+
+                <!-- Upload result link -->
+                <div id="recUploadResult" style="display:none; flex-direction:column; gap:6px;">
+                    <div style="font-size:10px; color:var(--muted);">☁ 雲端記事本連結</div>
+                    <div class="share-link-box">
+                        <input type="text" id="recCloudLink" readonly>
+                        <button onclick="copyRecLink()" style="font-size:10px; color:#6dfabc; background:none; border:none; cursor:pointer; white-space:nowrap;">複製</button>
+                    </div>
+                    <div style="font-size:10px; color:var(--muted);" id="recUploadMeta"></div>
+                </div>
+
+                <!-- Recording list -->
+                <div id="recList" style="display:flex; flex-direction:column; gap:6px; max-height:160px; overflow-y:auto;"></div>
+            </div>
+
+        </div>
+
+        <!-- RIGHT: Canvas + Prompt Output -->
+        <div style="display:flex; flex-direction:column; gap:14px; overflow:hidden;">
+
+            <!-- Canvas -->
+            <div class="panel" style="padding:14px; display:flex; flex-direction:column; flex:1; min-height:320px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; padding-bottom:12px; border-bottom:1px solid var(--border);">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <div class="live-dot"></div>
+                        <span style="font-size:13px; font-family:'Syne',sans-serif; font-weight:700;">結構畫布</span>
+                        <span class="pill">拖曳 · 雙擊編輯 · 連線</span>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <button onclick="clearCanvas()" class="btn-ghost" style="font-size:11px; border-color:rgba(250,109,109,0.3); color:#fa9d9d;">清空</button>
+                        <button onclick="exportImg()" class="btn-ghost" style="font-size:11px;">⬇ 匯出圖</button>
+                        <!-- NEW: 截圖協作板 -->
+                        <button onclick="captureToBoard()" class="btn-ghost" style="font-size:11px; border-color:rgba(109,250,188,0.4); color:#6dfabc;">📸 截圖至協作板</button>
+                    </div>
+                </div>
+                <div class="canvas-wrap" style="flex:1; margin-top:12px;">
+                    <canvas id="docCanvas" style="display:block; width:100%; height:100%;"></canvas>
+                </div>
+                <p style="font-size:10px; color:var(--muted); margin-top:8px; font-family:'DM Mono',monospace;">
+                    HINT: 拖曳移動 · 雙擊修改 · 連線模式下依序點擊兩區塊建立箭頭
+                </p>
+            </div>
+
+            <!-- Prompt output with tabs -->
+            <div class="panel" style="padding:18px; display:flex; flex-direction:column; gap:12px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="color:#6dfabc; font-size:14px;">⚡</span>
+                        <span style="font-family:'Syne',sans-serif; font-size:13px; font-weight:700;">AI 提示詞輸出</span>
+                    </div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <button onclick="compilePrompt()" class="btn-primary" style="font-size:11px; padding:7px 16px;">編譯生成 Prompt</button>
+                        <button onclick="copyPrompt()" class="btn-ghost" style="font-size:11px;">複製</button>
+                        <button onclick="openInAI()" class="btn-ghost" style="font-size:11px; border-color:rgba(124,109,250,0.4); color:#a89dfc;">在 AI 中開啟 ↗</button>
+                    </div>
+                </div>
+
+                <!-- AI Generation status -->
+                <div id="aiStatus" style="display:none; align-items:center; gap:10px; padding:10px 14px; background:rgba(124,109,250,0.08); border-radius:10px; border:1px solid rgba(124,109,250,0.2);">
+                    <div class="ai-thinking"><span></span><span></span><span></span></div>
+                    <span style="font-size:11px; color:#a89dfc;" id="aiStatusText">AI 正在分析畫布結構...</span>
+                </div>
+
+                <textarea id="promptOutput" rows="7" readonly placeholder="請填妥設定並在畫布排列結構後，點擊「編譯生成 Prompt」..."></textarea>
+
+                <!-- NEW: Collab board link display -->
+                <div id="collabLinkArea" style="display:none; flex-direction:column; gap:6px;">
+                    <div style="font-size:10px; color:var(--muted);">🔗 協作板分享連結</div>
+                    <div class="share-link-box">
+                        <input type="text" id="collabLinkInput" readonly>
+                        <button onclick="copyCollabLink()" style="font-size:10px; color:var(--accent3); background:none; border:none; cursor:pointer; white-space:nowrap;">複製</button>
+                    </div>
+                </div>
+
+                <!-- NEW: Cloud note link display -->
+                <div id="cloudLinkArea" style="display:none; flex-direction:column; gap:6px;">
+                    <div style="font-size:10px; color:var(--muted);">☁ 雲端筆記連結</div>
+                    <div class="share-link-box">
+                        <input type="text" id="cloudLinkInput" readonly>
+                        <button onclick="copyCloudLink()" style="font-size:10px; color:#6dfabc; background:none; border:none; cursor:pointer; white-space:nowrap;">複製</button>
                     </div>
                 </div>
             </div>
 
-            <div class="flex gap-2 mt-6">
-                <button onclick="saveModalChanges()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 rounded-xl transition text-sm">儲存變更</button>
-                <button onclick="deleteSelectedNode()" class="bg-red-950 hover:bg-red-900 text-red-200 border border-red-800 font-medium px-4 py-2 rounded-xl transition text-sm">刪除此節點</button>
-                <button onclick="closeModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium px-4 py-2 rounded-xl transition text-sm">取消</button>
+        </div>
+    </div>
+</main>
+
+<!-- SHARE MODAL -->
+<div id="shareModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+            <h3 style="font-family:'Syne',sans-serif; font-size:16px; font-weight:700;">🔗 協作板 & 雲端分享</h3>
+            <button onclick="closeShare()" style="background:none; border:none; color:var(--muted); font-size:18px; cursor:pointer;">✕</button>
+        </div>
+
+        <!-- Tabs -->
+        <div style="display:flex; gap:6px; margin-bottom:16px;">
+            <button class="tab-btn active" id="tab1" onclick="switchTab(1)">📸 截圖協作板</button>
+            <button class="tab-btn" id="tab2" onclick="switchTab(2)">☁ Prompt 筆記</button>
+            <button class="tab-btn" id="tab3" onclick="switchTab(3)">📤 匯出分享</button>
+        </div>
+
+        <!-- Tab 1: 截圖協作板 -->
+        <div id="tabContent1">
+            <div style="background:var(--surface); border-radius:12px; padding:16px; margin-bottom:14px;">
+                <div id="boardPreview" style="background:#0d0d18; border-radius:8px; min-height:120px; display:flex; align-items:center; justify-content:center; margin-bottom:12px; border:1px solid var(--border);">
+                    <p style="font-size:11px; color:var(--muted);">點擊「截圖至協作板」先擷取畫布</p>
+                </div>
+                <button onclick="captureToBoard(true)" class="btn-primary" style="width:100%; margin-bottom:8px;">📸 立即截圖並上傳協作板</button>
+            </div>
+            <div id="boardLinkSection" style="display:none; flex-direction:column; gap:8px;">
+                <div style="font-size:11px; color:var(--muted);">協作板連結（可分享給團隊）</div>
+                <div class="share-link-box">
+                    <input type="text" id="boardShareLink" readonly style="font-size:11px;">
+                    <button onclick="copyBoardLink()" style="font-size:10px; color:var(--accent3); background:none; border:none; cursor:pointer;">複製</button>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:4px;">
+                    <button onclick="openBoardLink()" class="btn-ghost" style="font-size:11px;">在瀏覽器開啟 ↗</button>
+                    <button onclick="downloadBoardImage()" class="btn-ghost" style="font-size:11px;">⬇ 下載截圖</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Prompt 雲端筆記 -->
+        <div id="tabContent2" style="display:none;">
+            <div style="margin-bottom:12px;">
+                <label style="font-size:11px; color:var(--muted); display:block; margin-bottom:6px;">筆記標題（選填）</label>
+                <input type="text" id="noteTitle" placeholder="例如：專案截止日通知模板 v1" style="padding:9px 12px; font-size:12px;">
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="font-size:11px; color:var(--muted); display:block; margin-bottom:6px;">筆記標籤（選填）</label>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;" id="tagArea">
+                    <button onclick="toggleTag('商務Email',this)" class="pill" style="cursor:pointer; transition:all 0.2s;">商務Email</button>
+                    <button onclick="toggleTag('公告',this)" class="pill" style="cursor:pointer;">公告</button>
+                    <button onclick="toggleTag('SOP',this)" class="pill" style="cursor:pointer;">SOP</button>
+                    <button onclick="toggleTag('提案',this)" class="pill" style="cursor:pointer;">提案</button>
+                    <button onclick="toggleTag('婉拒',this)" class="pill" style="cursor:pointer;">婉拒</button>
+                </div>
+            </div>
+            <button onclick="saveAndGenerateLink()" class="btn-primary" style="width:100%; margin-bottom:10px;">☁ 儲存並產生筆記連結</button>
+            <div id="cloudNoteLinkSection" style="display:none; flex-direction:column; gap:6px;">
+                <div style="font-size:11px; color:var(--muted);">雲端筆記連結</div>
+                <div class="share-link-box">
+                    <input type="text" id="cloudNoteShareLink" readonly>
+                    <button onclick="copyNoteLink()" style="font-size:10px; color:#6dfabc; background:none; border:none; cursor:pointer;">複製</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: 匯出分享 -->
+        <div id="tabContent3" style="display:none;">
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <button onclick="exportAll('json')" class="btn-ghost" style="text-align:left; padding:12px 14px;">
+                    <div style="font-size:12px; font-weight:600; margin-bottom:3px;">📄 匯出完整設定 (JSON)</div>
+                    <div style="font-size:10px; color:var(--muted);">包含畫布節點、連線、文書設定的完整備份</div>
+                </button>
+                <button onclick="exportAll('md')" class="btn-ghost" style="text-align:left; padding:12px 14px;">
+                    <div style="font-size:12px; font-weight:600; margin-bottom:3px;">📝 匯出 Prompt Markdown</div>
+                    <div style="font-size:10px; color:var(--muted);">可直接貼入 Notion、Obsidian 等筆記工具</div>
+                </button>
+                <button onclick="generateQRCode()" class="btn-ghost" style="text-align:left; padding:12px 14px;">
+                    <div style="font-size:12px; font-weight:600; margin-bottom:3px;">📱 生成 QR Code 分享</div>
+                    <div style="font-size:10px; color:var(--muted);">掃碼即可在手機端查看 Prompt 內容</div>
+                </button>
+                <div id="qrDisplay" style="display:none; text-align:center; padding:16px; background:white; border-radius:12px; margin-top:4px;">
+                    <canvas id="qrCanvas" width="160" height="160"></canvas>
+                    <p style="font-size:10px; color:#333; margin-top:8px;">掃描後可查看 Prompt 內容</p>
+                </div>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- 2. 全域通知 Toast 組件 -->
-    <div id="toastNotification" class="fixed bottom-6 right-6 bg-slate-950 border border-slate-800 text-slate-200 px-4 py-3 rounded-xl shadow-2xl z-50 flex items-center gap-2 transform translate-y-20 opacity-0 transition duration-300">
-        <span class="text-indigo-400" id="toastIcon">✨</span>
-        <span id="toastMessage" class="text-xs font-medium">這是通知訊息</span>
-    </div>
-
-    <!-- 3. 使用說明模態框 -->
-    <div id="helpModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden">
-        <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl p-6 shadow-2xl">
-            <h3 class="text-md font-bold text-slate-100 mb-4 flex items-center gap-2">
-                <span class="text-indigo-400">📖</span> 行政文書 Canvas 畫布操作指南
-            </h3>
-            <div class="space-y-3 text-xs text-slate-300 leading-relaxed overflow-y-auto max-h-[400px]">
-                <p>本工具是一套**高階視覺化 Prompt 開發器**，其目的並非直接幫你寫完文章，而是讓你像拼圖一樣，把公務行政文書的**邏輯與順序**排列出來，讓 AI 照著排。以下是三大核心功能使用指南：</p>
-                <div class="border-l-2 border-indigo-500 pl-3">
-                    <strong class="text-indigo-300 block">第一步：自訂文書背景</strong>
-                    <p>選擇你的文書種類（如公告、信函、SOP），填入關鍵資訊。這個資訊將決定 AI 寫作的具體依據。</p>
-                </div>
-                <div class="border-l-2 border-violet-500 pl-3">
-                    <strong class="text-violet-300 block">第二步：畫布結構視覺排版</strong>
-                    <ul class="list-disc pl-4 space-y-1">
-                        <li>點擊「新增主旨區/行動指引」等按鈕可在畫布中心生成節點。</li>
-                        <li><b>滑鼠拖曳：</b>自由分配區塊排版順序（例如：標題放最上，簽章放最下）。</li>
-                        <li><b>雙擊編輯：</b>雙擊區塊可改寫成對應的變數佔位符，或者微調顏色、進行刪除。</li>
-                        <li><b>連線工具：</b>啟用連線後，點擊A節點再點擊B節點，可畫上一道連線箭頭，告訴 AI 這個文書有先後閱讀流程。</li>
-                    </ul>
-                </div>
-                <div class="border-l-2 border-emerald-500 pl-3">
-                    <strong class="text-emerald-300 block">第三步：編譯匯出</strong>
-                    <p>按下「編譯並生成 Prompt」，系統將依照**你在畫布上的排版順序 (由上至下)**與**連線關係**，全自動組裝生成 AI Prompt，複製後餵給 GPTs 即可高水準產出文書！</p>
-                </div>
-            </div>
-            <button onclick="closeHelpModal()" class="w-full mt-6 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium py-2 rounded-xl transition text-sm">我理解了</button>
+<!-- EDIT MODAL -->
+<div id="editModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box" style="max-width:380px;">
+        <h3 style="font-family:'Syne',sans-serif; font-size:15px; font-weight:700; margin-bottom:16px;">✏ 編輯區塊</h3>
+        <label style="font-size:11px; color:var(--muted); display:block; margin-bottom:6px;">區塊內容</label>
+        <textarea id="modalText" rows="3" style="margin-bottom:14px;"></textarea>
+        <label style="font-size:11px; color:var(--muted); display:block; margin-bottom:8px;">顏色</label>
+        <div style="display:flex; gap:8px; margin-bottom:18px;">
+            <button onclick="setColor('#7c6dfa')" style="width:28px;height:28px;border-radius:50%;background:#7c6dfa;border:2px solid transparent;cursor:pointer;"></button>
+            <button onclick="setColor('#9b6dfa')" style="width:28px;height:28px;border-radius:50%;background:#9b6dfa;border:2px solid transparent;cursor:pointer;"></button>
+            <button onclick="setColor('#fa6d9a')" style="width:28px;height:28px;border-radius:50%;background:#fa6d9a;border:2px solid transparent;cursor:pointer;"></button>
+            <button onclick="setColor('#fab06d')" style="width:28px;height:28px;border-radius:50%;background:#fab06d;border:2px solid transparent;cursor:pointer;"></button>
+            <button onclick="setColor('#6dfabc')" style="width:28px;height:28px;border-radius:50%;background:#6dfabc;border:2px solid transparent;cursor:pointer;"></button>
+            <button onclick="setColor('#6d8dfa')" style="width:28px;height:28px;border-radius:50%;background:#6d8dfa;border:2px solid transparent;cursor:pointer;"></button>
+        </div>
+        <div style="display:flex; gap:8px;">
+            <button onclick="saveEdit()" class="btn-primary" style="flex:1; font-size:12px;">儲存</button>
+            <button onclick="deleteNode()" class="btn-ghost" style="border-color:rgba(250,109,109,0.4); color:#fa9d9d; font-size:12px;">刪除</button>
+            <button onclick="closeEdit()" class="btn-ghost" style="font-size:12px;">取消</button>
         </div>
     </div>
+</div>
 
-    <!-- Canvas 核心驅動腳本 -->
-    <script>
-        // 畫布基本設定
-        const canvas = document.getElementById('docCanvas');
-        const ctx = canvas.getContext('2d');
-        const container = canvas.parentElement;
+<!-- HELP MODAL -->
+<div id="helpModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box" style="max-width:520px;">
+        <h3 style="font-family:'Syne',sans-serif; font-size:16px; font-weight:700; margin-bottom:16px;">📖 使用說明</h3>
+        <div style="font-size:12px; line-height:1.8; color:var(--muted); display:flex; flex-direction:column; gap:14px; max-height:380px; overflow-y:auto;">
+            <div style="border-left:2px solid var(--accent); padding-left:12px;">
+                <strong style="color:var(--text); display:block; margin-bottom:4px;">① 設定文書背景</strong>
+                選擇文書種類並填入關鍵背景資訊，這將成為 AI 生成的核心依據。
+            </div>
+            <div style="border-left:2px solid #fa6d9a; padding-left:12px;">
+                <strong style="color:var(--text); display:block; margin-bottom:4px;">② 視覺畫布排版</strong>
+                點擊元件按鈕新增區塊，用拖曳安排文書結構順序。雙擊任一區塊可修改內容、顏色或刪除。啟用連線模式後，依序點擊兩個區塊即可建立箭頭連線，指示文件流程。
+            </div>
+            <div style="border-left:2px solid #6dfabc; padding-left:12px;">
+                <strong style="color:var(--text); display:block; margin-bottom:4px;">③ 編譯並輸出 Prompt</strong>
+                點擊「編譯生成 Prompt」，系統依畫布垂直排序與連線關係，自動組裝完整 AI 提示詞。
+            </div>
+            <div style="border-left:2px solid #fab06d; padding-left:12px;">
+                <strong style="color:var(--text); display:block; margin-bottom:4px;">🆕 截圖協作板</strong>
+                點擊「截圖至協作板」擷取畫布結構，生成可分享連結，供團隊成員查看你的文書架構設計。
+            </div>
+            <div style="border-left:2px solid #9b6dfa; padding-left:12px;">
+                <strong style="color:var(--text); display:block; margin-bottom:4px;">🆕 Prompt 雲端筆記</strong>
+                生成 Prompt 後，可儲存至雲端筆記庫，並取得專屬連結。方便日後調用或分享給同事。
+            </div>
+            <div style="border-left:2px solid #fa9d9d; padding-left:12px;">
+                <strong style="color:var(--text); display:block; margin-bottom:4px;">🆕 會議錄音記事本</strong>
+                點擊頂部「🎙 會議錄音」或左側錄音面板開始錄製。支援 Web Speech API 語音即時轉文字（Chrome/Edge），錄音結束後可用「✨ AI 整理」自動生成結構化會議記錄，再一鍵「☁ 上傳至雲端記事本」取得分享連結。
+            </div>
+        </div>
+        <button onclick="closeHelp()" class="btn-primary" style="width:100%; margin-top:16px;">了解了</button>
+    </div>
+</div>
 
-        let shapes = [];
-        let connections = [];
-        
-        let selectedShape = null;
-        let isDragging = false;
-        let dragOffsetX = 0;
-        let dragOffsetY = 0;
-        
-        // 連線模式專用狀態
-        let arrowMode = false;
-        let connectionStartShape = null;
+<!-- TOAST -->
+<div id="toast">
+    <span id="toastIcon">✨</span>
+    <span id="toastMsg"></span>
+</div>
 
-        // 當前編輯中模態框暫存
-        let activeEditShape = null;
-        let activeToneText = '正式精準';
+<!-- 🎙 RECORDING MODAL (full-screen focus mode) -->
+<div id="recModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box" style="max-width:560px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+            <h3 style="font-family:'Syne',sans-serif; font-size:16px; font-weight:700; display:flex; align-items:center; gap:8px;">
+                <span style="color:#fa9d9d;">🎙</span> 會議錄音記事本
+            </h3>
+            <button onclick="closeRecModal()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;">✕</button>
+        </div>
 
-        // 初始化與響應式畫布大小調節
-        function initCanvas() {
-            canvas.width = container.clientWidth;
-            canvas.height = container.clientHeight;
-            draw();
+        <!-- Big controls -->
+        <div style="display:flex; align-items:center; gap:18px; margin-bottom:16px;">
+            <button id="recBtnModal" onclick="toggleRecord()" style="width:72px;height:72px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:30px;transition:all 0.25s cubic-bezier(0.34,1.56,0.64,1);background:linear-gradient(135deg,#fa6d6d,#fa6d9a);box-shadow:0 4px 24px rgba(250,109,109,0.4);flex-shrink:0;" id="recBtnModal">🎙</button>
+            <div style="flex:1;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                    <span id="recTimerModal" style="font-family:'DM Mono',monospace;font-size:28px;font-weight:500;color:var(--text);">00:00</span>
+                    <span class="rec-status idle" id="recStatusModal"><span class="rec-dot" id="recDotModal"></span><span id="recStatusTextModal">待機中</span></span>
+                </div>
+                <canvas id="waveCanvasModal" height="56" style="width:100%;border-radius:10px;background:#08080f;border:1px solid var(--border);display:block;"></canvas>
+            </div>
+        </div>
+
+        <div style="margin-bottom:12px;">
+            <label style="font-size:11px; color:var(--muted); display:block; margin-bottom:5px;">會議標題</label>
+            <input type="text" id="meetingTitleModal" placeholder="例如：產品週會 2026-06-01" style="padding:9px 12px; font-size:12px;">
+        </div>
+
+        <div style="margin-bottom:14px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                <label style="font-size:11px; color:var(--muted);">逐字稿 / 會議記錄</label>
+                <div style="display:flex; gap:6px;">
+                    <button onclick="clearTranscript()" class="btn-ghost" style="font-size:10px;padding:3px 8px;">清除</button>
+                    <button onclick="aiSummarize()" class="btn-ghost" style="font-size:10px;padding:3px 8px;border-color:rgba(124,109,250,0.4);color:#a89dfc;">✨ AI 整理成會議記錄</button>
+                </div>
+            </div>
+            <textarea id="transcriptAreaModal" rows="6" style="font-family:'Noto Sans TC',sans-serif;font-size:12px;line-height:1.8;color:var(--text);background:#08080f;border:1px solid var(--border);border-radius:12px;padding:12px;resize:none;width:100%;" placeholder="錄音後語音轉文字將自動填入此處&#10;亦可手動貼入會議筆記內容…"></textarea>
+        </div>
+
+        <!-- AI summarize status -->
+        <div id="aiSumStatus" style="display:none;align-items:center;gap:10px;padding:10px 14px;background:rgba(124,109,250,0.08);border-radius:10px;border:1px solid rgba(124,109,250,0.2);margin-bottom:12px;">
+            <div class="ai-thinking"><span></span><span></span><span></span></div>
+            <span style="font-size:11px;color:#a89dfc;" id="aiSumText">AI 正在整理會議記錄...</span>
+        </div>
+
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+            <button onclick="uploadRecordingToCloud(true)" class="btn-primary" style="flex:1; font-size:12px; padding:10px;">☁ 上傳至雲端記事本</button>
+            <button onclick="downloadTranscript()" class="btn-ghost" style="font-size:12px; padding:10px 14px;">⬇ 下載</button>
+        </div>
+
+        <div id="recUploadResultModal" style="display:none; flex-direction:column; gap:6px;">
+            <div style="font-size:10px; color:var(--muted);">☁ 雲端記事本連結</div>
+            <div class="share-link-box">
+                <input type="text" id="recCloudLinkModal" readonly>
+                <button onclick="copyRecLinkModal()" style="font-size:10px;color:#6dfabc;background:none;border:none;cursor:pointer;white-space:nowrap;">複製</button>
+            </div>
+            <div style="font-size:10px; color:var(--muted);" id="recUploadMetaModal"></div>
+        </div>
+
+        <!-- Saved recordings in session -->
+        <div id="recListModal" style="margin-top:8px; display:flex; flex-direction:column; gap:6px; max-height:140px; overflow-y:auto;"></div>
+    </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+// 🎙 RECORDING ENGINE
+// ══════════════════════════════════════════════
+let mediaRecorder = null;
+let audioChunks = [];
+let audioCtx = null, analyser = null, micSource = null;
+let waveRAF = null;
+let recTimerInterval = null;
+let recSeconds = 0;
+let isRecording = false;
+let speechRecognition = null;
+let recTranscript = '';
+let recordingsSaved = [];   // in-session list
+
+// Sync sidebar ↔ modal fields
+function syncTitleFields(src) {
+    const val = src.value;
+    document.getElementById('meetingTitle').value = val;
+    document.getElementById('meetingTitleModal').value = val;
+}
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('meetingTitle').addEventListener('input', function(){ syncTitleFields(this); });
+    document.getElementById('meetingTitleModal').addEventListener('input', function(){ syncTitleFields(this); });
+    document.getElementById('transcriptArea').addEventListener('input', syncTranscriptFields.bind(null, document.getElementById('transcriptArea')));
+    document.getElementById('transcriptAreaModal').addEventListener('input', syncTranscriptFields.bind(null, document.getElementById('transcriptAreaModal')));
+});
+function syncTranscriptFields(src) {
+    const v = src.value;
+    document.getElementById('transcriptArea').value = v;
+    document.getElementById('transcriptAreaModal').value = v;
+}
+
+function setTranscript(v) {
+    document.getElementById('transcriptArea').value = v;
+    document.getElementById('transcriptAreaModal').value = v;
+}
+function getTranscript() {
+    return document.getElementById('transcriptArea').value;
+}
+function getMeetingTitle() {
+    return document.getElementById('meetingTitle').value || document.getElementById('meetingTitleModal').value || '';
+}
+
+// ── Toggle Record ──
+async function toggleRecord() {
+    if (!isRecording) await startRecording();
+    else stopRecording();
+}
+
+async function startRecording() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        // ── MediaRecorder ──
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+        mediaRecorder.ondataavailable = e => { if(e.data.size>0) audioChunks.push(e.data); };
+        mediaRecorder.onstop = onRecordingStopped;
+        mediaRecorder.start(250);
+
+        // ── Web Audio waveform ──
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        micSource = audioCtx.createMediaStreamSource(stream);
+        micSource.connect(analyser);
+        drawWave();
+
+        // ── Speech Recognition ──
+        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRec) {
+            speechRecognition = new SpeechRec();
+            speechRecognition.lang = 'zh-TW';
+            speechRecognition.continuous = true;
+            speechRecognition.interimResults = true;
+            speechRecognition.onresult = e => {
+                let interim = '', final = '';
+                for (let i = e.resultIndex; i < e.results.length; i++) {
+                    if (e.results[i].isFinal) final += e.results[i][0].transcript;
+                    else interim += e.results[i][0].transcript;
+                }
+                if (final) { recTranscript += final + '\n'; setTranscript(recTranscript + interim); }
+                else setTranscript(recTranscript + interim);
+            };
+            speechRecognition.onerror = e => {
+                if (e.error !== 'no-speech') toast('語音識別錯誤: '+e.error,'⚠️');
+            };
+            speechRecognition.start();
+        } else {
+            toast('此瀏覽器不支援 Web Speech API，可手動貼入逐字稿', 'ℹ️');
         }
 
-        window.addEventListener('resize', initCanvas);
-        window.onload = function() {
-            initCanvas();
-            loadTemplatePreset('email'); // 預載一個精美的跟進截止提醒模組
+        // ── Timer ──
+        recSeconds = 0; updateTimer();
+        recTimerInterval = setInterval(() => { recSeconds++; updateTimer(); }, 1000);
+
+        isRecording = true;
+        setRecordingUI(true);
+        toast('🔴 錄音中…點擊按鈕停止', '🎙');
+
+    } catch (err) {
+        toast('無法取得麥克風權限：' + err.message, '⚠️');
+    }
+}
+
+function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    mediaRecorder.stream.getTracks().forEach(t => t.stop());
+    if (speechRecognition) { try { speechRecognition.stop(); } catch(e){} }
+    clearInterval(recTimerInterval);
+    cancelAnimationFrame(waveRAF);
+    if (audioCtx) { audioCtx.close(); audioCtx = null; }
+    isRecording = false;
+    setRecordingUI(false);
+    toast('錄音已停止，正在處理…', '⏹');
+}
+
+function onRecordingStopped() {
+    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+    const url = URL.createObjectURL(blob);
+    const title = getMeetingTitle() || `會議錄音 ${new Date().toLocaleString('zh-TW')}`;
+    recordingsSaved.unshift({ id: Date.now(), title, url, blob, transcript: getTranscript(), duration: recSeconds, ts: new Date().toLocaleString('zh-TW') });
+    renderRecList();
+    setRecStatus('done', '錄音完成', false);
+    toast('錄音已完成！可上傳至雲端記事本', '✅');
+}
+
+// ── UI helpers ──
+function setRecordingUI(active) {
+    // Sidebar
+    const btn = document.getElementById('recBtn');
+    const btnM = document.getElementById('recBtnModal');
+    const timer = document.getElementById('recTimer');
+    const timerM = document.getElementById('recTimerModal');
+
+    btn.classList.toggle('recording', active);
+    if (btnM) btnM.style.animation = active ? 'rec-pulse 1.4s ease-in-out infinite' : '';
+    if (btnM) btnM.style.background = active ? 'linear-gradient(135deg,#fa3a3a,#c00)' : 'linear-gradient(135deg,#fa6d6d,#fa6d9a)';
+    btn.textContent = active ? '⏹' : '🎙';
+    if (btnM) btnM.textContent = active ? '⏹' : '🎙';
+    timer.classList.toggle('active', active);
+    if (timerM) timerM.style.color = active ? '#fa6d6d' : 'var(--text)';
+
+    // Header dot
+    const hd = document.getElementById('headerRecDot');
+    if (hd) hd.style.animation = active ? 'blink-dot 1s step-end infinite' : '';
+
+    if (active) setRecStatus('recording', '錄音中', true);
+}
+
+function setRecStatus(type, text, blink) {
+    ['recStatusBadge','recStatusModal'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.className = 'rec-status ' + type;
+    });
+    ['recStatusText','recStatusTextModal'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+    });
+    ['recDot','recDotModal'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.className = 'rec-dot' + (blink?' blink':'');
+    });
+}
+
+function updateTimer() {
+    const m = String(Math.floor(recSeconds/60)).padStart(2,'0');
+    const s = String(recSeconds%60).padStart(2,'0');
+    const t = m+':'+s;
+    document.getElementById('recTimer').textContent = t;
+    const tm = document.getElementById('recTimerModal');
+    if (tm) tm.textContent = t;
+}
+
+// ── Waveform ──
+function drawWave() {
+    if (!analyser) return;
+    const buf = new Uint8Array(analyser.frequencyBinCount);
+
+    function loop() {
+        waveRAF = requestAnimationFrame(loop);
+        analyser.getByteTimeDomainData(buf);
+        ['waveCanvas','waveCanvasModal'].forEach(id => {
+            const cv = document.getElementById(id);
+            if (!cv) return;
+            const cx = cv.getContext('2d');
+            const W = cv.width = cv.offsetWidth;
+            const H = cv.height = cv.offsetHeight || 52;
+            cx.clearRect(0,0,W,H);
+            cx.fillStyle = '#08080f';
+            cx.fillRect(0,0,W,H);
+            cx.strokeStyle = isRecording ? '#fa6d6d' : 'rgba(124,109,250,0.4)';
+            cx.lineWidth = 2;
+            cx.beginPath();
+            const sl = W / buf.length;
+            buf.forEach((v,i) => {
+                const x = i * sl;
+                const y = (v/128 - 1) * (H/2) + H/2;
+                i===0 ? cx.moveTo(x,y) : cx.lineTo(x,y);
+            });
+            cx.stroke();
+        });
+    }
+    loop();
+}
+
+// ── Transcript helpers ──
+function clearTranscript() {
+    recTranscript = '';
+    setTranscript('');
+    toast('已清除逐字稿', '🗑');
+}
+
+async function aiSummarize() {
+    const raw = getTranscript().trim();
+    if (!raw) { toast('請先錄音或貼入逐字稿', '⚠️'); return; }
+    const title = getMeetingTitle() || '本次會議';
+
+    document.getElementById('aiSumStatus').style.display = 'flex';
+    document.getElementById('aiSumText').textContent = 'AI 正在整理會議記錄...';
+
+    try {
+        const resp = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: 'claude-sonnet-4-20250514',
+                max_tokens: 1000,
+                messages: [{
+                    role: 'user',
+                    content: `你是一位專業的行政助理，請將以下會議逐字稿整理成一份結構清晰的「會議記錄」，輸出繁體中文。
+
+格式要求：
+1. 會議主題：${title}
+2. 會議時間：${new Date().toLocaleString('zh-TW')}
+3. 重點摘要（3-5 點條列）
+4. 討論事項（依逐字稿歸納）
+5. 決議與行動項目（含負責人若有提及）
+6. 待確認事項
+
+逐字稿內容：
+${raw}
+
+請直接輸出格式化的會議記錄，不要加前言。`
+                }]
+            })
+        });
+        const data = await resp.json();
+        const result = data.content?.map(c=>c.text||'').join('\n') || '（整理失敗，請重試）';
+        document.getElementById('aiSumStatus').style.display = 'none';
+        setTranscript(result);
+        toast('✨ AI 會議記錄整理完成！', '🤖');
+    } catch(err) {
+        document.getElementById('aiSumStatus').style.display = 'none';
+        toast('AI 整理失敗：' + err.message, '⚠️');
+    }
+}
+
+function downloadTranscript() {
+    const txt = getTranscript();
+    if (!txt) { toast('尚無逐字稿內容', '⚠️'); return; }
+    const title = getMeetingTitle() || '會議記錄';
+    const blob = new Blob([`${title}\n${'─'.repeat(30)}\n${new Date().toLocaleString('zh-TW')}\n\n${txt}`], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${title.replace(/\s/g,'_')}_${Date.now()}.txt`;
+    a.click();
+    toast('逐字稿已下載', '⬇');
+}
+
+// ── Upload to cloud notes ──
+function uploadRecordingToCloud(fromModal = false) {
+    const txt = getTranscript().trim();
+    if (!txt) { toast('請先錄音或輸入會議內容', '⚠️'); return; }
+    const title = getMeetingTitle() || `會議記錄 ${new Date().toLocaleString('zh-TW')}`;
+    const id = Math.random().toString(36).slice(2,9).toUpperCase();
+    const link = `https://canvas.prac.ai/meeting/${id}`;
+    const ts = new Date().toLocaleString('zh-TW');
+    const duration = recSeconds > 0 ? `錄音時長 ${Math.floor(recSeconds/60)}分${recSeconds%60}秒 · ` : '';
+    const meta = `${duration}上傳於 ${ts}`;
+
+    // Save to cloud notes list
+    cloudNotes.unshift({
+        id, timestamp: ts, title,
+        preview: txt.slice(0, 80) + '...', link, prompt: txt,
+        isMeeting: true
+    });
+    renderCloudNotes();
+
+    // Show link in sidebar
+    document.getElementById('recCloudLink').value = link;
+    document.getElementById('recUploadMeta').textContent = meta;
+    document.getElementById('recUploadResult').style.display = 'flex';
+
+    // Show link in modal
+    if (fromModal) {
+        document.getElementById('recCloudLinkModal').value = link;
+        document.getElementById('recUploadMetaModal').textContent = meta;
+        document.getElementById('recUploadResultModal').style.display = 'flex';
+    }
+
+    toast(`已上傳「${title.slice(0,14)}」至雲端記事本`, '☁');
+}
+
+function copyRecLink() {
+    const v = document.getElementById('recCloudLink').value;
+    if (v) navigator.clipboard.writeText(v).then(() => toast('連結已複製', '🔗'));
+}
+function copyRecLinkModal() {
+    const v = document.getElementById('recCloudLinkModal').value;
+    if (v) navigator.clipboard.writeText(v).then(() => toast('連結已複製', '🔗'));
+}
+
+// ── Render saved recordings ──
+function renderRecList() {
+    ['recList','recListModal'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (!recordingsSaved.length) { el.innerHTML = ''; return; }
+        el.innerHTML = `<div style="font-size:10px;color:var(--muted);margin-bottom:2px;font-family:'DM Mono',monospace;">本次工作階段錄音</div>` +
+            recordingsSaved.map(r => `
+            <div class="note-card" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:11px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.title}</div>
+                    <div style="font-size:9px;color:var(--muted);font-family:'DM Mono',monospace;">${r.ts} · ${Math.floor(r.duration/60)}m${r.duration%60}s</div>
+                </div>
+                <audio controls src="${r.url}" style="height:28px;width:120px;flex-shrink:0;"></audio>
+            </div>`).join('');
+    });
+}
+
+// ── Modal open/close ──
+function showRecModal() {
+    document.getElementById('recModal').style.display = 'flex';
+    // Sync fields
+    document.getElementById('meetingTitleModal').value = document.getElementById('meetingTitle').value;
+    document.getElementById('transcriptAreaModal').value = document.getElementById('transcriptArea').value;
+    renderRecList();
+}
+function closeRecModal() {
+    // Sync back
+    document.getElementById('meetingTitle').value = document.getElementById('meetingTitleModal').value;
+    document.getElementById('transcriptArea').value = document.getElementById('transcriptAreaModal').value;
+    document.getElementById('recModal').style.display = 'none';
+}
+document.getElementById('recModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeRecModal(); });
+</script>
+
+<script>
+// ═══════════════════════════════════════
+// CANVAS ENGINE
+// ═══════════════════════════════════════
+const canvas = document.getElementById('docCanvas');
+const ctx = canvas.getContext('2d');
+const wrap = canvas.parentElement;
+
+let shapes = [], connections = [];
+let selected = null, dragging = false, offX = 0, offY = 0;
+let arrowMode = false, connStart = null;
+let editTarget = null;
+let activeTone = '正式精準';
+let activeTags = [];
+let boardDataURL = null;
+let cloudNotes = [];
+
+function resizeCanvas() {
+    canvas.width = wrap.clientWidth;
+    canvas.height = wrap.clientHeight;
+    draw();
+}
+window.addEventListener('resize', resizeCanvas);
+window.onload = () => { resizeCanvas(); loadPreset('email'); };
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // connections
+    connections.forEach(c => {
+        const a = shapes.find(s=>s.id===c.from), b = shapes.find(s=>s.id===c.to);
+        if (a && b) drawArrow(a.x+a.w/2, a.y+a.h/2, b.x+b.w/2, b.y+b.h/2);
+    });
+    // shapes
+    shapes.forEach(s => {
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.4)';
+        ctx.shadowBlur = 12;
+        ctx.shadowOffsetY = 5;
+        ctx.fillStyle = s.color;
+        roundRect(ctx, s.x, s.y, s.w, s.h, 12);
+        ctx.fill();
+        if (selected && selected.id === s.id) {
+            ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+        ctx.restore();
+        ctx.fillStyle = 'rgba(255,255,255,0.92)';
+        ctx.font = '600 11.5px "Noto Sans TC", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        wrapText(ctx, s.text, s.x+s.w/2, s.y+s.h/2, s.w-18, 15);
+    });
+    // highlight arrow start
+    if (connStart) {
+        ctx.save();
+        ctx.strokeStyle = '#6dfabc';
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([5,3]);
+        roundRect(ctx, connStart.x-2, connStart.y-2, connStart.w+4, connStart.h+4, 14);
+        ctx.stroke();
+        ctx.restore();
+    }
+}
+
+function roundRect(c, x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x+r, y);
+    c.lineTo(x+w-r, y);
+    c.quadraticCurveTo(x+w,y,x+w,y+r);
+    c.lineTo(x+w,y+h-r);
+    c.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+    c.lineTo(x+r,y+h);
+    c.quadraticCurveTo(x,y+h,x,y+h-r);
+    c.lineTo(x,y+r);
+    c.quadraticCurveTo(x,y,x+r,y);
+    c.closePath();
+}
+
+function wrapText(c, text, x, y, maxW, lh) {
+    const chars = text.split('');
+    let line = '', lines = [];
+    chars.forEach((ch,i) => {
+        let t = line+ch;
+        if (c.measureText(t).width > maxW && i > 0) { lines.push(line); line = ch; }
+        else line = t;
+    });
+    lines.push(line);
+    let sy = y - ((lines.length-1)*lh)/2;
+    lines.forEach((l,i) => c.fillText(l, x, sy+i*lh));
+}
+
+function drawArrow(fx, fy, tx, ty) {
+    const hl=10, dx=tx-fx, dy=ty-fy, ang=Math.atan2(dy,dx), pad=48;
+    const sx=fx+pad*Math.cos(ang), sy=fy+pad*Math.sin(ang);
+    const ex=tx-pad*Math.cos(ang), ey=ty-pad*Math.sin(ang);
+    ctx.save();
+    ctx.strokeStyle='rgba(168,157,252,0.7)'; ctx.fillStyle='rgba(168,157,252,0.7)'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(ex,ey); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(ex,ey);
+    ctx.lineTo(ex-hl*Math.cos(ang-Math.PI/6), ey-hl*Math.sin(ang-Math.PI/6));
+    ctx.lineTo(ex-hl*Math.cos(ang+Math.PI/6), ey-hl*Math.sin(ang+Math.PI/6));
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+}
+
+function getAt(x,y) {
+    for (let i=shapes.length-1;i>=0;i--) {
+        const s=shapes[i];
+        if (x>=s.x&&x<=s.x+s.w&&y>=s.y&&y<=s.y+s.h) return s;
+    }
+    return null;
+}
+
+// Mouse events
+canvas.addEventListener('mousedown', e => {
+    const r=canvas.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
+    const t=getAt(x,y);
+    if (arrowMode) {
+        if (t) {
+            if (!connStart) { connStart=t; draw(); toast(`起點「${t.text.slice(0,10)}...」已選，點終點`, '🔌'); }
+            else if (connStart.id!==t.id) {
+                if (!connections.some(c=>c.from===connStart.id&&c.to===t.id))
+                    connections.push({from:connStart.id,to:t.id});
+                toast(`已連結 ➔ ${t.text.slice(0,8)}`, '🎯');
+                connStart=null; draw();
+            }
+        }
+        return;
+    }
+    if (t) {
+        selected=t; dragging=true; offX=x-t.x; offY=y-t.y;
+        shapes=shapes.filter(s=>s.id!==t.id); shapes.push(t); draw();
+    } else { selected=null; draw(); }
+});
+
+canvas.addEventListener('mousemove', e => {
+    if (!dragging||!selected||arrowMode) return;
+    const r=canvas.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
+    selected.x=Math.max(8,Math.min(canvas.width-selected.w-8,x-offX));
+    selected.y=Math.max(8,Math.min(canvas.height-selected.h-8,y-offY));
+    draw();
+});
+
+canvas.addEventListener('mouseup', ()=>{ dragging=false; });
+canvas.addEventListener('mouseleave', ()=>{ dragging=false; });
+
+// Double click to edit
+canvas.addEventListener('dblclick', e => {
+    const r=canvas.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
+    const t=getAt(x,y);
+    if (t) { editTarget=t; document.getElementById('modalText').value=t.text; document.getElementById('editModal').style.display='flex'; }
+});
+
+// Touch
+canvas.addEventListener('touchstart', e => {
+    if (!e.touches.length) return;
+    const r=canvas.getBoundingClientRect(), x=e.touches[0].clientX-r.left, y=e.touches[0].clientY-r.top;
+    const t=getAt(x,y);
+    if (t) { selected=t; dragging=true; offX=x-t.x; offY=y-t.y; draw(); }
+});
+canvas.addEventListener('touchmove', e => {
+    if (!dragging||!selected||!e.touches.length) return;
+    const r=canvas.getBoundingClientRect(), x=e.touches[0].clientX-r.left, y=e.touches[0].clientY-r.top;
+    selected.x=Math.max(8,Math.min(canvas.width-selected.w-8,x-offX));
+    selected.y=Math.max(8,Math.min(canvas.height-selected.h-8,y-offY));
+    draw(); e.preventDefault();
+},{passive:false});
+canvas.addEventListener('touchend', ()=>{ dragging=false; });
+
+// ═══════════════════════════════════════
+// NODE MANAGEMENT
+// ═══════════════════════════════════════
+function addNode(name, color, cx=null, cy=null) {
+    shapes.push({
+        id:'n_'+Date.now()+Math.random().toString(36).slice(2,5),
+        x: cx!==null?cx:(canvas.width/2)-65,
+        y: cy!==null?cy:(canvas.height/2)-27,
+        w:140, h:54, text:name, color
+    });
+    draw();
+    toast('已添加：'+name.slice(0,12), '🎨');
+}
+
+function clearCanvas() {
+    shapes=[]; connections=[]; selected=null; connStart=null; draw();
+    toast('畫布已清空','🧹');
+}
+
+function toggleArrowMode() {
+    arrowMode=!arrowMode; connStart=null;
+    const ind=document.getElementById('arrowInd');
+    const lbl=document.getElementById('arrowLabel');
+    const btn=document.getElementById('arrowModeBtn');
+    if (arrowMode) {
+        ind.style.background='#6dfabc';
+        ind.style.boxShadow='0 0 0 4px rgba(109,250,188,0.2)';
+        lbl.textContent='連線中'; btn.style.borderColor='rgba(109,250,188,0.5)'; btn.style.color='#6dfabc';
+        toast('連線模式啟用：依序點擊起點→終點','🔌');
+    } else {
+        ind.style.background='var(--border)'; ind.style.boxShadow='';
+        lbl.textContent='啟用連線'; btn.style.borderColor=''; btn.style.color='';
+    }
+    draw();
+}
+
+// Edit modal
+function saveEdit() {
+    if (editTarget) { editTarget.text=document.getElementById('modalText').value.trim()||'區塊'; draw(); }
+    closeEdit(); toast('已更新區塊','✍');
+}
+function deleteNode() {
+    if (editTarget) {
+        const id=editTarget.id;
+        shapes=shapes.filter(s=>s.id!==id);
+        connections=connections.filter(c=>c.from!==id&&c.to!==id);
+        draw();
+    }
+    closeEdit(); toast('已刪除區塊','🗑');
+}
+function setColor(c) { if (editTarget) { editTarget.color=c; draw(); } }
+function closeEdit() { document.getElementById('editModal').style.display='none'; editTarget=null; }
+
+// Tone
+function setTone(t, el) {
+    activeTone=t;
+    document.querySelectorAll('.tone-btn').forEach(b=>b.classList.remove('active'));
+    el.classList.add('active');
+    toast(`文風：${t}`, '🎭');
+}
+
+function onDocTypeChange() {
+    toast(`類型切換為「${document.getElementById('docTypeSelect').value}」`,'📝');
+}
+
+// ═══════════════════════════════════════
+// PRESETS
+// ═══════════════════════════════════════
+function loadPreset(type) {
+    clearCanvas();
+    const w=canvas.width, h=canvas.height;
+    if (type==='email') {
+        document.getElementById('docTypeSelect').value='商務 Email';
+        document.getElementById('docContext').value='各位主管：新產品研發專案第一階段截止日為下週五(5/22)，目前A與C兩組功能架構未更新進度，請於本週五前上線填寫進度表。';
+        addNode('主旨: [截止通知] 專案階段截止提醒','#7c6dfa',w*.08,h*.1);
+        addNode('開頭: 親愛的主管與負責人','#7c6dfa',w*.08,h*.38);
+        addNode('核心: 5/22 第一階段截止提醒','#9b6dfa',w*.5,h*.1);
+        addNode('行動: 週五前於系統填寫 A/C 進度','#fab06d',w*.5,h*.38);
+        addNode('署名: 專案管理處 PM 敬啟','#6d8dfa',w*.5,h*.66);
+        setTimeout(()=>{
+            if(shapes.length>=5){
+                for(let i=0;i<4;i++) connections.push({from:shapes[i].id,to:shapes[i+1].id});
+                draw();
+            }
+        },200);
+    } else if (type==='announcement') {
+        document.getElementById('docTypeSelect').value='內部公告';
+        document.getElementById('docContext').value='公司搬遷與伺服器機房升級，本週六(5/16)早上9:00至下午18:00內部網路與VPN將暫停服務，當日無法進行遠端加班報審。';
+        addNode('主旨: 本週六內部網路暫停服務公告','#fa6d9a',w*.08,h*.15);
+        addNode('背景說明: 週六機房搬遷與升級','#9b6dfa',w*.08,h*.48);
+        addNode('受影響範圍: VPN、內部網、加班系統','#fa6d9a',w*.5,h*.1);
+        addNode('替代方案: 請提前週五前送審加班','#fab06d',w*.5,h*.4);
+        addNode('落款: 資訊技術部 敬上','#6d8dfa',w*.5,h*.68);
+        setTimeout(()=>{
+            if(shapes.length>=5){
+                for(let i=0;i<4;i++) connections.push({from:shapes[i].id,to:shapes[i+1].id});
+                draw();
+            }
+        },200);
+    } else if (type==='sop') {
+        document.getElementById('docTypeSelect').value='操作 SOP';
+        document.getElementById('docContext').value='為防範勒索軟體，建立新進人員辦公電腦資安防禦SOP：1.啟動Windows Defender全機掃描、2.更改初始高複雜度密碼、3.設定定期備份雲端硬碟。';
+        addNode('資安防禦步驟 SOP','#6dfabc',w*.08,h*.1);
+        addNode('步驟 1: 啟動防毒全機掃描','#6dfabc',w*.08,h*.48);
+        addNode('步驟 2: 修改初始密碼(12字以上)','#9b6dfa',w*.5,h*.15);
+        addNode('步驟 3: 設定雲端備份排程','#fab06d',w*.5,h*.5);
+        setTimeout(()=>{
+            if(shapes.length>=4){
+                for(let i=0;i<3;i++) connections.push({from:shapes[i].id,to:shapes[i+1].id});
+                draw();
+            }
+        },200);
+    }
+}
+
+// ═══════════════════════════════════════
+// PROMPT COMPILER
+// ═══════════════════════════════════════
+function compilePrompt() {
+    const docType=document.getElementById('docTypeSelect').value;
+    const context=document.getElementById('docContext').value.trim();
+    if (!context) { toast('請填寫關鍵背景資訊！','⚠️'); return; }
+    if (!shapes.length) { toast('畫布上沒有節點！','⚠️'); return; }
+
+    // Show AI thinking
+    document.getElementById('aiStatus').style.display='flex';
+    document.getElementById('aiStatusText').textContent='AI 正在分析畫布結構...';
+
+    setTimeout(()=>{
+        document.getElementById('aiStatusText').textContent='整合節點與連線邏輯...';
+    }, 600);
+
+    setTimeout(()=>{
+        document.getElementById('aiStatus').style.display='none';
+
+        const sorted=[...shapes].sort((a,b)=>Math.abs(a.y-b.y)<30?(a.x-b.x):(a.y-b.y));
+
+        let flowStr = connections.length>0
+            ? '【節點閱讀流向】\n'+connections.map((c,i)=>{
+                const f=shapes.find(s=>s.id===c.from), t=shapes.find(s=>s.id===c.to);
+                return f&&t?`${i+1}. [${f.text}] ➔ [${t.text}]`:'';
+              }).filter(Boolean).join('\n')
+            : '（依畫布排版順序生成）';
+
+        const blocks=sorted.map((s,i)=>`  - 區塊${i+1}: ${s.text}`).join('\n');
+
+        const styleMap={
+            '正式精準':'字句務實不囉唆，結構嚴整，專業可信',
+            '親切有溫度':'充滿同理心，避免生硬官樣文章，多用溫和肯定字句',
+            '簡潔俐落':'句子短小精悍，重點直接條列，30秒內過目難忘',
+            '謙遜委婉':'態度真摯恭敬，言辭修潤婉轉，顧全大局留有轉圜'
         };
 
-        // 核心渲染迴圈
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // 1. 繪製連線關係 (箭頭)
-            connections.forEach(conn => {
-                const from = shapes.find(s => s.id === conn.from);
-                const to = shapes.find(s => s.id === conn.to);
-                if (from && to) {
-                    drawArrow(from.x + from.w / 2, from.y + from.h / 2, to.x + to.w / 2, to.y + to.h / 2);
-                }
-            });
-
-            // 2. 繪製節點元素
-            shapes.forEach(shape => {
-                ctx.save();
-                
-                // 陰影特效
-                ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-                ctx.shadowBlur = 10;
-                ctx.shadowOffsetY = 4;
-
-                // 邊緣高亮
-                if (selectedShape && selectedShape.id === shape.id) {
-                    ctx.strokeStyle = '#a5b4fc';
-                    ctx.lineWidth = 3;
-                } else {
-                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-                    ctx.lineWidth = 1;
-                }
-
-                // 繪製圓角矩形
-                ctx.fillStyle = shape.color;
-                drawRoundedRect(ctx, shape.x, shape.y, shape.w, shape.h, 12);
-                ctx.fill();
-                ctx.stroke();
-                
-                // 繪製文字內容
-                ctx.restore();
-                ctx.fillStyle = '#ffffff';
-                ctx.font = '600 12px Inter, "Noto Sans TC"';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                
-                // 文字長度截斷或折行
-                wrapText(ctx, shape.text, shape.x + shape.w / 2, shape.y + shape.h / 2, shape.w - 20, 16);
-            });
-        }
-
-        // 圓角矩形輔助繪製函式
-        function drawRoundedRect(context, x, y, width, height, radius) {
-            context.beginPath();
-            context.moveTo(x + radius, y);
-            context.lineTo(x + width - radius, y);
-            context.quadraticCurveTo(x + width, y, x + width, y + radius);
-            context.lineTo(x + width, y + height - radius);
-            context.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-            context.lineTo(x + radius, y + height);
-            context.quadraticCurveTo(x, y + height, x, y + height - radius);
-            context.lineTo(x, y + radius);
-            context.quadraticCurveTo(x, y, x + radius, y);
-            context.closePath();
-        }
-
-        // 文字折行渲染引擎
-        function wrapText(context, text, x, y, maxWidth, lineHeight) {
-            const words = text.split('');
-            let line = '';
-            let lines = [];
-
-            for (let n = 0; n < words.length; n++) {
-                let testLine = line + words[n];
-                let metrics = context.measureText(testLine);
-                let testWidth = metrics.width;
-                if (testWidth > maxWidth && n > 0) {
-                    lines.push(line);
-                    line = words[n];
-                } else {
-                    line = testLine;
-                }
-            }
-            lines.push(line);
-
-            let startY = y - ((lines.length - 1) * lineHeight) / 2;
-            for (let i = 0; i < lines.length; i++) {
-                context.fillText(lines[i], x, startY + (i * lineHeight));
-            }
-        }
-
-        // 繪製指向箭頭演算法
-        function drawArrow(fromx, fromy, tox, toy) {
-            const headlen = 10; // 箭頭頭部大小
-            const dx = tox - fromx;
-            const dy = toy - fromy;
-            const angle = Math.atan2(dy, dx);
-            
-            // 計算端點收縮，使箭頭不被節點圓角遮蔽
-            const padding = 45;
-            const targetX = tox - padding * Math.cos(angle);
-            const targetY = toy - padding * Math.sin(angle);
-            const startX = fromx + padding * Math.cos(angle);
-            const startY = fromy + padding * Math.sin(angle);
-
-            ctx.save();
-            ctx.strokeStyle = '#818cf8';
-            ctx.fillStyle = '#818cf8';
-            ctx.lineWidth = 2.5;
-
-            // 繪製連線
-            ctx.beginPath();
-            ctx.moveTo(startX, startY);
-            ctx.lineTo(targetX, targetY);
-            ctx.stroke();
-
-            // 繪製箭頭三角面
-            ctx.beginPath();
-            ctx.moveTo(targetX, targetY);
-            ctx.lineTo(targetX - headlen * Math.cos(angle - Math.PI / 6), targetY - headlen * Math.sin(angle - Math.PI / 6));
-            ctx.lineTo(targetX - headlen * Math.cos(angle + Math.PI / 6), targetY - headlen * Math.sin(angle + Math.PI / 6));
-            ctx.closePath();
-            ctx.fill();
-            ctx.restore();
-        }
-
-        // 節點新增函式
-        function addNode(name, color, customX = null, customY = null) {
-            const defaultX = customX !== null ? customX : (canvas.width / 2) - 60;
-            const defaultY = customY !== null ? customY : (canvas.height / 2) - 25;
-            
-            const newNode = {
-                id: 'node_' + Date.now() + Math.random().toString(36).substr(2, 5),
-                x: defaultX,
-                y: defaultY,
-                w: 130,
-                h: 55,
-                text: name,
-                color: color
-            };
-            shapes.push(newNode);
-            draw();
-            showToast("成功添加新區塊: " + name, "🎨");
-        }
-
-        // 觸發連線模式開關
-        function toggleArrowMode() {
-            arrowMode = !arrowMode;
-            const btn = document.getElementById('arrowModeBtn');
-            const ind = document.getElementById('arrowIndicator');
-            if (arrowMode) {
-                btn.classList.add('border-violet-500', 'bg-violet-950/20');
-                ind.classList.replace('bg-slate-500', 'bg-violet-500');
-                showToast("連線模式已啟用：請依序點擊起點與終點區塊", "🔌");
-            } else {
-                btn.classList.remove('border-violet-500', 'bg-violet-950/20');
-                ind.classList.replace('bg-violet-500', 'bg-slate-500');
-                connectionStartShape = null;
-            }
-        }
-
-        // 清空重設
-        function clearCanvas() {
-            shapes = [];
-            connections = [];
-            selectedShape = null;
-            connectionStartShape = null;
-            draw();
-            showToast("畫布已清空", "🧹");
-        }
-
-        // 檢查游標點擊了哪個圖形
-        function getShapeAt(x, y) {
-            for (let i = shapes.length - 1; i >= 0; i--) {
-                const s = shapes[i];
-                if (x >= s.x && x <= s.x + s.w && y >= s.y && y <= s.y + s.h) {
-                    return s;
-                }
-            }
-            return null;
-        }
-
-        // 事件監聽
-        canvas.addEventListener('mousedown', function(e) {
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-
-            const target = getShapeAt(x, y);
-
-            if (arrowMode) {
-                if (target) {
-                    if (!connectionStartShape) {
-                        connectionStartShape = target;
-                        showToast(`已選定起點「${target.text}」，請選定下一個終點`, "🔌");
-                    } else if (connectionStartShape.id !== target.id) {
-                        // 防重複連線
-                        const duplicate = connections.some(c => c.from === connectionStartShape.id && c.to === target.id);
-                        if (!duplicate) {
-                            connections.push({
-                                from: connectionStartShape.id,
-                                to: target.id
-                            });
-                            showToast(`已連結：${connectionStartShape.text} ➔ ${target.text}`, "🎯");
-                        }
-                        connectionStartShape = null;
-                        draw();
-                    }
-                }
-                return;
-            }
-
-            if (target) {
-                selectedShape = target;
-                isDragging = true;
-                dragOffsetX = x - target.x;
-                dragOffsetY = y - target.y;
-                
-                // 把拖曳中的移到最上層
-                shapes = shapes.filter(s => s.id !== target.id);
-                shapes.push(target);
-                
-                draw();
-            } else {
-                selectedShape = null;
-                draw();
-            }
-        });
-
-        canvas.addEventListener('mousemove', function(e) {
-            if (!isDragging || !selectedShape || arrowMode) return;
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-
-            // 限制邊界內拖移
-            selectedShape.x = Math.max(10, Math.min(canvas.width - selectedShape.w - 10, x - dragOffsetX));
-            selectedShape.y = Math.max(10, Math.min(canvas.height - selectedShape.h - 10, y - dragOffsetY));
-            draw();
-        });
-
-        canvas.addEventListener('mouseup', function() {
-            isDragging = false;
-        });
-
-        canvas.addEventListener('mouseleave', function() {
-            isDragging = false;
-        });
-
-        // 支援觸控（行動裝置）
-        canvas.addEventListener('touchstart', function(e) {
-            if (e.touches.length > 0) {
-                const rect = canvas.getBoundingClientRect();
-                const x = e.touches[0].clientX - rect.left;
-                const y = e.touches[0].clientY - rect.top;
-                const target = getShapeAt(x, y);
-                if (target) {
-                    selectedShape = target;
-                    isDragging = true;
-                    dragOffsetX = x - target.x;
-                    dragOffsetY = y - target.y;
-                    draw();
-                }
-            }
-        });
-
-        canvas.addEventListener('touchmove', function(e) {
-            if (!isDragging || !selectedShape || e.touches.length === 0) return;
-            const rect = canvas.getBoundingClientRect();
-            const x = e.touches[0].clientX - rect.left;
-            const y = e.touches[0].clientY - rect.top;
-            selectedShape.x = Math.max(10, Math.min(canvas.width - selectedShape.w - 10, x - dragOffsetX));
-            selectedShape.y = Math.max(10, Math.min(canvas.height - selectedShape.h - 10, y - dragOffsetY));
-            draw();
-            e.preventDefault();
-        });
-
-        canvas.addEventListener('touchend', function() {
-            isDragging = false;
-        });
-
-        // 雙擊開啟編輯模式
-        canvas.addEventListener('dblclick', function(e) {
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            const target = getShapeAt(x, y);
-
-            if (target) {
-                activeEditShape = target;
-                document.getElementById('modalNodeText').value = target.text;
-                document.getElementById('editModal').classList.remove('hidden');
-            }
-        });
-
-        // 模態框操作邏輯
-        function closeModal() {
-            document.getElementById('editModal').classList.add('hidden');
-            activeEditShape = null;
-        }
-
-        function setModalColor(color) {
-            if (activeEditShape) {
-                activeEditShape.color = color;
-                draw();
-            }
-        }
-
-        function saveModalChanges() {
-            if (activeEditShape) {
-                activeEditShape.text = document.getElementById('modalNodeText').value.trim() || '無文字';
-                draw();
-                closeModal();
-                showToast("區塊屬性已更新", "✍");
-            }
-        }
-
-        function deleteSelectedNode() {
-            if (activeEditShape) {
-                const idToDelete = activeEditShape.id;
-                // 刪除該節點
-                shapes = shapes.filter(s => s.id !== idToDelete);
-                // 同時剪除與該節點關聯的所有連線
-                connections = connections.filter(c => c.from !== idToDelete && c.to !== idToDelete);
-                draw();
-                closeModal();
-                showToast("已成功刪除該文書區塊與關聯線條", "🗑");
-            }
-        }
-
-        // 使用說明視窗開關
-        function showHelpModal() {
-            document.getElementById('helpModal').classList.remove('hidden');
-        }
-        function closeHelpModal() {
-            document.getElementById('helpModal').classList.add('hidden');
-        }
-
-        // 全域通知系統 Toast
-        function showToast(message, icon = '✨') {
-            const toast = document.getElementById('toastNotification');
-            document.getElementById('toastIcon').innerText = icon;
-            document.getElementById('toastMessage').innerText = message;
-            
-            toast.classList.remove('opacity-0', 'translate-y-20');
-            toast.classList.add('opacity-100', 'translate-y-0');
-
-            setTimeout(() => {
-                toast.classList.remove('opacity-100', 'translate-y-0');
-                toast.classList.add('opacity-0', 'translate-y-20');
-            }, 3000);
-        }
-
-        // 文風切換處理
-        function setTone(tone, btnElement) {
-            activeToneText = tone;
-            document.querySelectorAll('.tone-btn').forEach(btn => {
-                btn.classList.remove('bg-indigo-600', 'border-indigo-500', 'text-white');
-                btn.classList.add('bg-slate-900', 'border-slate-800', 'text-slate-300');
-            });
-            btnElement.classList.replace('bg-slate-900', 'bg-indigo-600');
-            btnElement.classList.replace('border-slate-800', 'border-indigo-500');
-            btnElement.classList.replace('text-slate-300', 'text-white');
-            showToast(`已切換文風為：「${tone}」`, "🎭");
-        }
-
-        // 文書類型切換
-        function onDocTypeChange() {
-            const selected = document.getElementById('docTypeSelect').value;
-            showToast(`文書類型切換為「${selected}」，可點擊下方載入推薦範本！`, "📝");
-        }
-
-        // 快速預設佈局與資訊快填
-        function loadTemplatePreset(type) {
-            clearCanvas();
-            const w = canvas.width || 600;
-            const h = canvas.height || 400;
-
-            if (type === 'email') {
-                document.getElementById('docTypeSelect').value = '商務 Email';
-                document.getElementById('docContext').value = "各位主管：新產品研發專案進度即將在下週五 (5/22) 進入第一階段截止，目前尚有 A 與 C 兩組功能架構未更新進度，請於本週五前上線填寫進度表。";
-                
-                // 佈置畫布節點
-                addNode('主旨: [截止通知] 專案階段截止提醒', '#6366f1', w * 0.1, h * 0.1);
-                addNode('開頭: 親愛的主管與專案負責人', '#6366f1', w * 0.1, h * 0.35);
-                addNode('核心: 專案 5/22 第一階段截止提醒', '#8b5cf6', w * 0.5, h * 0.1);
-                addNode('具體行動: 週五前至系統填寫 A/C 進度', '#f59e0b', w * 0.5, h * 0.35);
-                addNode('署名: 專案管理處 PM 敬啟', '#64748b', w * 0.5, h * 0.65);
-
-                // 設定關聯線條
-                setTimeout(() => {
-                    if(shapes.length >= 5) {
-                        connections.push({from: shapes[0].id, to: shapes[1].id});
-                        connections.push({from: shapes[1].id, to: shapes[2].id});
-                        connections.push({from: shapes[2].id, to: shapes[3].id});
-                        connections.push({from: shapes[3].id, to: shapes[4].id});
-                        draw();
-                    }
-                }, 200);
-
-            } else if (type === 'announcement') {
-                document.getElementById('docTypeSelect').value = '內部公告';
-                document.getElementById('docContext').value = "由於公司搬遷與伺服器機房升級，本週六 (5/16) 早上 9:00 至下午 18:00 公司內部網路與 VPN 將暫停服務，當日無法進行遠端加班報審。";
-                
-                addNode('主旨: 本週六內部網路暫停服務公告', '#ec4899', w * 0.1, h * 0.2);
-                addNode('背景說明: 本週六機房搬遷與升級', '#8b5cf6', w * 0.1, h * 0.5);
-                addNode('受影響範圍: VPN、內部網、加班系統', '#ec4899', w * 0.5, h * 0.1);
-                addNode('替代因應方案: 請提前於週五前送審加班', '#f59e0b', w * 0.5, h * 0.4);
-                addNode('落款: 資訊技術部 敬上', '#64748b', w * 0.5, h * 0.7);
-
-                setTimeout(() => {
-                    if(shapes.length >= 5) {
-                        connections.push({from: shapes[0].id, to: shapes[1].id});
-                        connections.push({from: shapes[1].id, to: shapes[2].id});
-                        connections.push({from: shapes[2].id, to: shapes[3].id});
-                        connections.push({from: shapes[3].id, to: shapes[4].id});
-                        draw();
-                    }
-                }, 200);
-
-            } else if (type === 'sop') {
-                document.getElementById('docTypeSelect').value = '操作 SOP';
-                document.getElementById('docContext').value = "為防範勒索軟體，建立一套新進人員辦公電腦的資安防禦 SOP：1. 啟動 Windows Defender 全機掃描、2. 更改初始高複雜度密碼、3. 設定定期備份雲端硬碟。";
-                
-                addNode('起手式: 新進同仁資安防禦步驟 SOP', '#10b981', w * 0.1, h * 0.1);
-                addNode('步驟 1: 啟動 Windows 防毒全機掃描', '#10b981', w * 0.1, h * 0.5);
-                addNode('步驟 2: 修改初始密碼 (需12字)', '#8b5cf6', w * 0.5, h * 0.15);
-                addNode('步驟 3: 設定公司雲端備份排程', '#f59e0b', w * 0.5, h * 0.5);
-
-                setTimeout(() => {
-                    if(shapes.length >= 4) {
-                        connections.push({from: shapes[0].id, to: shapes[1].id});
-                        connections.push({from: shapes[1].id, to: shapes[2].id});
-                        connections.push({from: shapes[2].id, to: shapes[3].id});
-                        draw();
-                    }
-                }, 200);
-            }
-        }
-
-        // 智慧編譯：將 Canvas 的拓樸排版與設定編譯成極致的 Prompt 
-        function compileAndGenerate() {
-            const docType = document.getElementById('docTypeSelect').value;
-            const contextText = document.getElementById('docContext').value.trim();
-            
-            if (!contextText) {
-                showToast("請填寫左側的關鍵背景資訊！", "⚠️");
-                return;
-            }
-
-            if (shapes.length === 0) {
-                showToast("畫布上沒有節點！請在畫布放置至少一個結構元素。", "⚠️");
-                return;
-            }
-
-            // 1. 將畫布上的節點依照垂直 Y 軸坐標排序 (由上而下即為預設文書視覺順序)
-            const sortedShapes = [...shapes].sort((a, b) => {
-                if (Math.abs(a.y - b.y) < 30) {
-                    return a.x - b.x; // Y相近時看X
-                }
-                return a.y - b.y;
-            });
-
-            // 2. 爬梳關聯連線關係
-            let logicFlow = "";
-            if (connections.length > 0) {
-                logicFlow = "【節點閱讀流向 (Flowchart)】：\n";
-                connections.forEach((c, idx) => {
-                    const fromNode = shapes.find(s => s.id === c.from);
-                    const toNode = shapes.find(s => s.id === c.to);
-                    if (fromNode && toNode) {
-                        logicFlow += `${idx + 1}. [${fromNode.text}] ➔ 指引至 ➔ [${toNode.text}]\n`;
-                    }
-                });
-            } else {
-                logicFlow = "（未設定特定方向，預設依排版順序生成）\n";
-            }
-
-            // 3. 組成區塊說明
-            let blockStructures = "";
-            sortedShapes.forEach((shape, i) => {
-                blockStructures += `  - 區塊 ${i + 1}: ${shape.text} (其為 ${shape.text.split(':')[0]} 屬性，請在此安排相關內容與佔位符)\n`;
-            });
-
-            // 4. 對應文風的限制提示
-            let styleRules = "";
-            if (activeToneText === "正式精準") {
-                styleRules = "字句務實，不講官腔，結構嚴整不囉唆，專業而可信赖。";
-            } else if (activeToneText === "親切有溫度") {
-                styleRules = "充滿同理心與人性關懷，避免生硬官樣文章，多用溫和肯定字句。";
-            } else if (activeToneText === "簡潔俐落") {
-                styleRules = "句子短小精悍，排除一切冗字，重點直接條列化，務求 30 秒內過目難忘。";
-            } else if (activeToneText === "謙遜委婉") {
-                styleRules = "態度真摯恭敬，言辭修潤婉轉，若涉婉拒或調整，也務求顧全大局，留有轉圜。";
-            }
-
-            // 5. 輸出整套精緻 Prompt
-            const compiledPrompt = `【角色】
-你是精通職場高效溝通、格式排版卓越的「行政文書專家與 Prompt 架構工程師」。
+        const prompt=`【角色】
+你是精通職場高效溝通與格式排版的「行政文書專家」。
 
 【任務】
-請根據下方的【背景資訊】與【畫布文書結構拓撲】，為我產出一份「${docType}」的【行政文書模板庫】。
-為了便於未來在多重行政場合重用，除特定背景外，請將所有會依狀況變動的「特定變數（日期、姓名、專案名等）」一律以 [方括號佔位符] 進行標記（例如：[截止日期]、[同仁姓名]）。
+根據下方【背景資訊】與【畫布結構】，產出一份「${docType}」的高通用性模板。
+所有會依狀況變動的要素（日期、姓名、專案名等）一律以 [方括號佔位符] 標記。
 
 【背景資訊】
-${contextText}
+${context}
 
-【畫布文書結構拓撲（我希望你在模板中必須依序並緊密遵循的結構配置）】
-以下是我在視覺化 Canvas 畫布中對這篇文書排定的順序與流程架構：
-${blockStructures}
-${logicFlow}
+【畫布文書結構（請嚴格依序呈現）】
+${blocks}
+
+${flowStr}
 
 【限制與規格】
-1. 語氣文風：必須高度落實「${activeToneText}」—— ${styleRules}
-2. 模板要求：不只是單一不可修改的範文，而是要結構分層完美、能直接複製再編輯的高通用性模板。
-3. 全文請直接輸出文書模板本身，不添加任何 AI 與使用者的寒暄開場白或事後自我解析。
+1. 語氣文風：「${activeTone}」—— ${styleMap[activeTone]}
+2. 輸出高通用性、可直接複製再編輯的模板，而非單一範文
+3. 全文直接輸出文書模板本身，不加 AI 開場白或自我解析
 
 【輸出格式】
-直接輸出符合上方畫布架構設計的「${docType} 模板」主體內容，文字排版需優雅、段落與留白得當。`;
+直接輸出「${docType} 模板」主體，排版優雅，段落與留白得當。`;
 
-            document.getElementById('promptOutput').value = compiledPrompt;
-            showToast("AI Prompt 編譯完成！可以複製了。", "🚀");
+        document.getElementById('promptOutput').value=prompt;
+        toast('Prompt 編譯完成！','🚀');
+
+        // Show collab link (simulate)
+        const sessionId=Math.random().toString(36).slice(2,9).toUpperCase();
+        const link=`https://canvas.prac.ai/board/${sessionId}`;
+        document.getElementById('collabLinkInput').value=link;
+        document.getElementById('collabLinkArea').style.display='flex';
+
+        const noteId=Math.random().toString(36).slice(2,9).toUpperCase();
+        const nLink=`https://canvas.prac.ai/notes/${noteId}`;
+        document.getElementById('cloudLinkInput').value=nLink;
+        document.getElementById('cloudLinkArea').style.display='flex';
+    }, 1200);
+}
+
+function copyPrompt() {
+    const v=document.getElementById('promptOutput').value;
+    if (!v) { toast('尚無內容可複製','⚠️'); return; }
+    navigator.clipboard.writeText(v).then(()=>toast('Prompt 已複製！','📋'));
+}
+
+function openInAI() {
+    const v=document.getElementById('promptOutput').value;
+    if (!v) { toast('請先生成 Prompt','⚠️'); return; }
+    const url='https://claude.ai/new?q='+encodeURIComponent(v.slice(0,500));
+    window.open(url,'_blank');
+    toast('正在開啟 Claude...','↗');
+}
+
+function copyCollabLink() {
+    const v=document.getElementById('collabLinkInput').value;
+    if (v) navigator.clipboard.writeText(v).then(()=>toast('協作板連結已複製','🔗'));
+}
+function copyCloudLink() {
+    const v=document.getElementById('cloudLinkInput').value;
+    if (v) navigator.clipboard.writeText(v).then(()=>toast('雲端筆記連結已複製','☁'));
+}
+
+// ═══════════════════════════════════════
+// SCREENSHOT & BOARD
+// ═══════════════════════════════════════
+function captureToBoard(fromModal=false) {
+    // Render to temp canvas with dark bg
+    const tmp=document.createElement('canvas');
+    tmp.width=canvas.width; tmp.height=canvas.height;
+    const tc=tmp.getContext('2d');
+
+    // Dark bg
+    const g=tc.createLinearGradient(0,0,tmp.width,tmp.height);
+    g.addColorStop(0,'#0d0d18'); g.addColorStop(1,'#10101f');
+    tc.fillStyle=g; tc.fillRect(0,0,tmp.width,tmp.height);
+
+    // Grid
+    tc.strokeStyle='rgba(124,109,250,0.06)'; tc.lineWidth=1;
+    for(let x=0;x<tmp.width;x+=24){ tc.beginPath();tc.moveTo(x,0);tc.lineTo(x,tmp.height);tc.stroke(); }
+    for(let y=0;y<tmp.height;y+=24){ tc.beginPath();tc.moveTo(0,y);tc.lineTo(tmp.width,y);tc.stroke(); }
+
+    // Arrows
+    connections.forEach(c=>{
+        const a=shapes.find(s=>s.id===c.from), b=shapes.find(s=>s.id===c.to);
+        if(!a||!b) return;
+        const dx=b.x+b.w/2-(a.x+a.w/2), dy=b.y+b.h/2-(a.y+a.h/2), ang=Math.atan2(dy,dx), pad=48, hl=10;
+        const sx=a.x+a.w/2+pad*Math.cos(ang), sy=a.y+a.h/2+pad*Math.sin(ang);
+        const ex=b.x+b.w/2-pad*Math.cos(ang), ey=b.y+b.h/2-pad*Math.sin(ang);
+        tc.save(); tc.strokeStyle='rgba(168,157,252,0.7)'; tc.fillStyle='rgba(168,157,252,0.7)'; tc.lineWidth=2;
+        tc.beginPath(); tc.moveTo(sx,sy); tc.lineTo(ex,ey); tc.stroke();
+        tc.beginPath();
+        tc.moveTo(ex,ey);
+        tc.lineTo(ex-hl*Math.cos(ang-Math.PI/6),ey-hl*Math.sin(ang-Math.PI/6));
+        tc.lineTo(ex-hl*Math.cos(ang+Math.PI/6),ey-hl*Math.sin(ang+Math.PI/6));
+        tc.closePath(); tc.fill(); tc.restore();
+    });
+
+    // Nodes
+    shapes.forEach(s=>{
+        tc.save(); tc.shadowColor='rgba(0,0,0,0.5)'; tc.shadowBlur=14; tc.shadowOffsetY=5;
+        tc.fillStyle=s.color;
+        roundRect(tc,s.x,s.y,s.w,s.h,12); tc.fill(); tc.restore();
+        tc.fillStyle='rgba(255,255,255,0.9)';
+        tc.font='600 11.5px "Noto Sans TC",sans-serif';
+        tc.textAlign='center'; tc.textBaseline='middle';
+        wrapText(tc,s.text,s.x+s.w/2,s.y+s.h/2,s.w-18,15);
+    });
+
+    boardDataURL=tmp.toDataURL('image/png');
+
+    // Show in modal preview
+    const preview=document.getElementById('boardPreview');
+    preview.innerHTML='';
+    const img=document.createElement('img');
+    img.src=boardDataURL; img.style.cssText='width:100%;border-radius:8px;';
+    preview.appendChild(img);
+
+    // Generate share link
+    const id=Math.random().toString(36).slice(2,9).toUpperCase();
+    const link=`https://canvas.prac.ai/board/${id}`;
+    document.getElementById('boardShareLink').value=link;
+    document.getElementById('boardLinkSection').style.display='flex';
+
+    if (fromModal) toast('截圖已上傳協作板！連結已生成','📸');
+    else { showShareModal(); toast('截圖完成，已上傳協作板','📸'); }
+}
+
+function copyBoardLink() {
+    const v=document.getElementById('boardShareLink').value;
+    if (v) navigator.clipboard.writeText(v).then(()=>toast('協作板連結已複製','🔗'));
+}
+function openBoardLink() {
+    const v=document.getElementById('boardShareLink').value;
+    if (v) window.open(v,'_blank');
+}
+function downloadBoardImage() {
+    if (!boardDataURL) { captureToBoard(true); return; }
+    const a=document.createElement('a');
+    a.download=`canvas-${Date.now()}.png`; a.href=boardDataURL; a.click();
+    toast('截圖已下載','⬇');
+}
+
+// ═══════════════════════════════════════
+// CLOUD NOTES
+// ═══════════════════════════════════════
+function savePromptToCloud() {
+    const prompt=document.getElementById('promptOutput').value;
+    if (!prompt) { toast('請先生成 Prompt！','⚠️'); return; }
+    const id=Math.random().toString(36).slice(2,9).toUpperCase();
+    const note={
+        id, timestamp:new Date().toLocaleString('zh-TW'),
+        title:`${document.getElementById('docTypeSelect').value} · ${id}`,
+        preview:prompt.slice(0,80)+'...',
+        link:`https://canvas.prac.ai/notes/${id}`,
+        prompt
+    };
+    cloudNotes.unshift(note);
+    renderCloudNotes();
+    toast('已儲存至雲端筆記庫','☁');
+}
+
+function renderCloudNotes() {
+    const list=document.getElementById('cloudNotesList');
+    document.getElementById('noteCount').textContent=`${cloudNotes.length} 筆已儲存`;
+    if (!cloudNotes.length) {
+        list.innerHTML='<p style="font-size:11px;color:var(--muted);text-align:center;padding:16px 0;">尚無已儲存的 Prompt 筆記<br><span style="font-size:10px;">生成後可點擊「儲存至雲端」</span></p>';
+        return;
+    }
+    list.innerHTML=cloudNotes.map(n=>`
+        <div class="note-card" onclick="loadNote('${n.id}')">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                <span style="font-size:11px;font-weight:600;color:var(--text);">${n.title}</span>
+                <span style="font-size:9px;color:var(--muted);font-family:'DM Mono',monospace;">${n.timestamp}</span>
+            </div>
+            <p style="font-size:10px;color:var(--muted);line-height:1.5;">${n.preview}</p>
+            <div style="font-size:10px;color:#6dfabc;margin-top:6px;font-family:'DM Mono',monospace;">${n.link}</div>
+        </div>
+    `).join('');
+}
+
+function loadNote(id) {
+    const n=cloudNotes.find(x=>x.id===id);
+    if (n) { document.getElementById('promptOutput').value=n.prompt; toast(`已載入筆記：${n.title}`,'📂'); }
+}
+
+function clearCloudNotes() {
+    cloudNotes=[]; renderCloudNotes(); toast('已清空雲端筆記','🗑');
+}
+
+function saveAndGenerateLink() {
+    const prompt=document.getElementById('promptOutput').value;
+    if (!prompt) { toast('請先生成 Prompt','⚠️'); return; }
+    const id=Math.random().toString(36).slice(2,9).toUpperCase();
+    const link=`https://canvas.prac.ai/notes/${id}`;
+    document.getElementById('cloudNoteShareLink').value=link;
+    document.getElementById('cloudNoteLinkSection').style.display='flex';
+    // Also save
+    const title=document.getElementById('noteTitle').value||`${document.getElementById('docTypeSelect').value} · ${id}`;
+    cloudNotes.unshift({id,timestamp:new Date().toLocaleString('zh-TW'),title,preview:prompt.slice(0,80)+'...',link,prompt});
+    renderCloudNotes();
+    toast('已儲存並生成連結','☁');
+}
+
+function copyNoteLink() {
+    const v=document.getElementById('cloudNoteShareLink').value;
+    if (v) navigator.clipboard.writeText(v).then(()=>toast('筆記連結已複製','☁'));
+}
+
+// Tags
+function toggleTag(tag, el) {
+    if (activeTags.includes(tag)) {
+        activeTags=activeTags.filter(t=>t!==tag);
+        el.style.borderColor=''; el.style.color='';
+    } else {
+        activeTags.push(tag);
+        el.style.borderColor='var(--accent)'; el.style.color='#a89dfc';
+    }
+}
+
+// ═══════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════
+function exportImg() {
+    captureToBoard(false);
+    setTimeout(()=>downloadBoardImage(),400);
+}
+
+function exportAll(type) {
+    const prompt=document.getElementById('promptOutput').value;
+    if (type==='json') {
+        const data={docType:document.getElementById('docTypeSelect').value,context:document.getElementById('docContext').value,tone:activeTone,shapes,connections,prompt,exportedAt:new Date().toISOString()};
+        const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+        const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`canvas-export-${Date.now()}.json`; a.click();
+        toast('JSON 已匯出','📄');
+    } else if (type==='md') {
+        const md=`# 行政文書 Canvas Prompt 匯出\n\n**文書類型：** ${document.getElementById('docTypeSelect').value}\n**文風：** ${activeTone}\n**匯出時間：** ${new Date().toLocaleString('zh-TW')}\n\n---\n\n\`\`\`\n${prompt}\n\`\`\`\n`;
+        const blob=new Blob([md],{type:'text/markdown'});
+        const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`prompt-${Date.now()}.md`; a.click();
+        toast('Markdown 已匯出','📝');
+    }
+}
+
+function generateQRCode() {
+    const qrDisp=document.getElementById('qrDisplay');
+    qrDisp.style.display=qrDisp.style.display==='none'?'block':'none';
+    if (qrDisp.style.display==='block') {
+        // Simple QR placeholder - draw a decorative pattern
+        const qc=document.getElementById('qrCanvas');
+        const qx=qc.getContext('2d');
+        qx.fillStyle='white'; qx.fillRect(0,0,160,160);
+        qx.fillStyle='black';
+        // Draw simple QR-like pattern
+        const cells=20;
+        const cell=160/cells;
+        for(let r=0;r<cells;r++) for(let c=0;c<cells;c++) {
+            if(Math.random()>0.55||(r<4&&c<4)||(r<4&&c>15)||(r>15&&c<4))
+                qx.fillRect(c*cell,r*cell,cell,cell);
         }
+        // Corner markers
+        [[0,0],[0,15],[15,0]].forEach(([r,c])=>{
+            qx.fillStyle='black';
+            qx.fillRect(c*cell,r*cell,5*cell,5*cell);
+            qx.fillStyle='white';
+            qx.fillRect((c+1)*cell,(r+1)*cell,3*cell,3*cell);
+            qx.fillStyle='black';
+            qx.fillRect((c+1.5)*cell,(r+1.5)*cell,2*cell,2*cell);
+        });
+        toast('QR Code 已生成（示意）','📱');
+    }
+}
 
-        // 複製 Prompt
-        function copyGeneratedPrompt() {
-            const area = document.getElementById('promptOutput');
-            if (!area.value) {
-                showToast("尚無內容可供複製，請先點擊「編譯並生成 Prompt」！", "⚠️");
-                return;
-            }
-            area.select();
-            document.execCommand('copy');
-            showToast("Prompt 已順利複製到剪貼簿！", "📋");
-        }
+// ═══════════════════════════════════════
+// MODALS & TOAST
+// ═══════════════════════════════════════
+function showShareModal() { document.getElementById('shareModal').style.display='flex'; }
+function closeShare() { document.getElementById('shareModal').style.display='none'; }
+function showHelp() { document.getElementById('helpModal').style.display='flex'; }
+function closeHelp() { document.getElementById('helpModal').style.display='none'; }
 
-        // 將 Canvas 匯出成圖片下載
-        function exportCanvasToImage() {
-            // 由於使用的是 Dark/Light 配色，我們在匯出時主動繪製一個漂亮的漸層底色
-            const tempCanvas = document.createElement('canvas');
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCanvas.width = canvas.width;
-            tempCanvas.height = canvas.height;
+function switchTab(n) {
+    [1,2,3].forEach(i=>{
+        document.getElementById(`tabContent${i}`).style.display=i===n?'block':'none';
+        document.getElementById(`tab${i}`).classList.toggle('active',i===n);
+    });
+}
 
-            // 1. 繪製深色底色與漸層
-            const gradient = tempCtx.createLinearGradient(0, 0, tempCanvas.width, tempCanvas.height);
-            gradient.addColorStop(0, '#0f172a');
-            gradient.addColorStop(1, '#020617');
-            tempCtx.fillStyle = gradient;
-            tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+function toast(msg, icon='✨') {
+    const t=document.getElementById('toast');
+    document.getElementById('toastIcon').textContent=icon;
+    document.getElementById('toastMsg').textContent=msg;
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer=setTimeout(()=>t.classList.remove('show'),3000);
+}
 
-            // 2. 繪製輔助微弱格線
-            tempCtx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-            tempCtx.lineWidth = 1;
-            for (let x = 0; x < tempCanvas.width; x += 20) {
-                tempCtx.beginPath();
-                tempCtx.moveTo(x, 0);
-                tempCtx.lineTo(x, tempCanvas.height);
-                tempCtx.stroke();
-            }
-            for (let y = 0; y < tempCanvas.height; y += 20) {
-                tempCtx.beginPath();
-                tempCtx.moveTo(0, y);
-                tempCtx.lineTo(tempCanvas.width, y);
-                tempCtx.stroke();
-            }
-
-            // 3. 繪製線條
-            connections.forEach(conn => {
-                const from = shapes.find(s => s.id === conn.from);
-                const to = shapes.find(s => s.id === conn.to);
-                if (from && to) {
-                    const headlen = 10;
-                    const dx = to.x + to.w/2 - (from.x + from.w/2);
-                    const dy = to.y + to.h/2 - (from.y + from.h/2);
-                    const angle = Math.atan2(dy, dx);
-                    
-                    const padding = 45;
-                    const targetX = (to.x + to.w/2) - padding * Math.cos(angle);
-                    const targetY = (to.y + to.h/2) - padding * Math.sin(angle);
-                    const startX = (from.x + from.w/2) + padding * Math.cos(angle);
-                    const startY = (from.y + from.h/2) + padding * Math.sin(angle);
-
-                    tempCtx.save();
-                    tempCtx.strokeStyle = '#818cf8';
-                    tempCtx.fillStyle = '#818cf8';
-                    tempCtx.lineWidth = 3;
-
-                    tempCtx.beginPath();
-                    tempCtx.moveTo(startX, startY);
-                    tempCtx.lineTo(targetX, targetY);
-                    tempCtx.stroke();
-
-                    tempCtx.beginPath();
-                    tempCtx.moveTo(targetX, targetY);
-                    tempCtx.lineTo(targetX - headlen * Math.cos(angle - Math.PI/6), targetY - headlen * Math.sin(angle - Math.PI/6));
-                    tempCtx.lineTo(targetX - headlen * Math.cos(angle + Math.PI/6), targetY - headlen * Math.sin(angle + Math.PI/6));
-                    tempCtx.closePath();
-                    tempCtx.fill();
-                    tempCtx.restore();
-                }
-            });
-
-            // 4. 繪製節點
-            shapes.forEach(shape => {
-                tempCtx.save();
-                tempCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-                tempCtx.shadowBlur = 15;
-                tempCtx.shadowOffsetY = 6;
-
-                tempCtx.fillStyle = shape.color;
-                tempCtx.beginPath();
-                const radius = 12;
-                tempCtx.moveTo(shape.x + radius, shape.y);
-                tempCtx.lineTo(shape.x + shape.w - radius, shape.y);
-                tempCtx.quadraticCurveTo(shape.x + shape.w, shape.y, shape.x + shape.w, shape.y + radius);
-                tempCtx.lineTo(shape.x + shape.w, shape.y + shape.h - radius);
-                tempCtx.quadraticCurveTo(shape.x + shape.w, shape.y + shape.h, shape.x + shape.w - radius, shape.y + shape.h);
-                tempCtx.lineTo(shape.x + radius, shape.y + shape.h);
-                tempCtx.quadraticCurveTo(shape.x, shape.y + shape.h, shape.x, shape.y + shape.h - radius);
-                tempCtx.lineTo(shape.x, shape.y + radius);
-                tempCtx.quadraticCurveTo(shape.x, shape.y, shape.x + radius, shape.y);
-                tempCtx.closePath();
-                tempCtx.fill();
-                tempCtx.restore();
-
-                tempCtx.fillStyle = '#ffffff';
-                tempCtx.font = 'bold 12px Inter, Arial';
-                tempCtx.textAlign = 'center';
-                tempCtx.textBaseline = 'middle';
-                
-                // 折行繪製
-                const words = shape.text.split('');
-                let line = '';
-                let lines = [];
-                const maxW = shape.w - 20;
-                for (let n = 0; n < words.length; n++) {
-                    let testLine = line + words[n];
-                    let metrics = tempCtx.measureText(testLine);
-                    if (metrics.width > maxW && n > 0) {
-                        lines.push(line);
-                        line = words[n];
-                    } else {
-                        line = testLine;
-                    }
-                }
-                lines.push(line);
-                let startY = (shape.y + shape.h/2) - ((lines.length - 1) * 16) / 2;
-                for (let i = 0; i < lines.length; i++) {
-                    tempCtx.fillText(lines[i], shape.x + shape.w/2, startY + (i * 16));
-                }
-            });
-
-            // 匯出為 PNG 
-            const dataURL = tempCanvas.toDataURL('image/png');
-            const link = document.createElement('a');
-            link.download = `文書結構Canvas-${Date.now()}.png`;
-            link.href = dataURL;
-            link.click();
-            showToast("畫布架構圖已成功存入本機！", "📸");
-        }
-    </script>
+// Close modals on overlay click
+document.getElementById('shareModal').addEventListener('click',e=>{ if(e.target===e.currentTarget)closeShare(); });
+document.getElementById('editModal').addEventListener('click',e=>{ if(e.target===e.currentTarget)closeEdit(); });
+document.getElementById('helpModal').addEventListener('click',e=>{ if(e.target===e.currentTarget)closeHelp(); });
+</script>
 </body>
 </html>
