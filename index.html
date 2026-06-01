@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>視覺化行政文書 Canvas 提示詞生成器</title>
+    <!-- 載入 Tailwind CSS 與 Inter 字體 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        /* 畫布網格背景 */
+        .canvas-container {
+            position: relative;
+            background-color: #f8fafc;
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        /* 隱藏原生卷軸美化 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
+
+    <!-- Navigation Bar -->
+    <header class="bg-slate-950 border-b border-slate-800 px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-3">
+            <div class="bg-indigo-600 p-2.5 rounded-xl text-white shadow-lg shadow-indigo-500/20">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">行政文書 Canvas 智慧生成工坊</h1>
+                <p class="text-xs text-slate-400">視覺化設計文書結構 ➔ AI 高階提示詞轉譯系統</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <span class="text-xs text-slate-400 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700">PRAC 2-1 進階版</span>
+            <button onclick="showHelpModal()" class="text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 transition px-3 py-1.5 rounded-lg border border-slate-700">使用說明</button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-6 p-6 overflow-hidden">
+        
+        <!-- 左側配置面板 (占 4 欄) -->
+        <section class="xl:col-span-4 flex flex-col gap-6 overflow-y-auto max-h-[calc(100vh-120px)] pr-2">
+            
+            <!-- STEP 1 & 2: 基礎文書設定 -->
+            <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-5 space-y-5 backdrop-blur-sm">
+                <h2 class="text-sm font-semibold tracking-wider text-indigo-400 uppercase flex items-center gap-2">
+                    <span class="bg-indigo-500/20 text-indigo-400 w-5 h-5 rounded-full inline-flex items-center justify-center text-xs">1</span>
+                    基礎文書設定
+                </h2>
+                
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-2">文書類型</label>
+                    <select id="docTypeSelect" onchange="onDocTypeChange()" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition">
+                        <option value="商務 Email">✉ 商務 Email</option>
+                        <option value="內部公告">📋 內部公告</option>
+                        <option value="會議議程">📅 會議議程</option>
+                        <option value="工作週報">📊 工作週報</option>
+                        <option value="操作 SOP">📝 操作 SOP</option>
+                        <option value="提案簡述">💡 提案簡述</option>
+                        <option value="婉拒信函">🙏 婉拒信函</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-2">關鍵背景資訊 (必填)</label>
+                    <textarea id="docContext" rows="3" placeholder="例如：專案A截止日通知、連假差勤管理新制、主管交接事宜..." class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition resize-none"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-2">語氣與文風</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="setTone('正式精準', this)" class="tone-btn text-xs bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 py-2 rounded-lg transition active-tone font-medium">正式精準</button>
+                        <button onclick="setTone('親切有溫度', this)" class="tone-btn text-xs bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 py-2 rounded-lg transition font-medium">親切有溫度</button>
+                        <button onclick="setTone('簡潔俐落', this)" class="tone-btn text-xs bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 py-2 rounded-lg transition font-medium">簡潔俐落</button>
+                        <button onclick="setTone('謙遜委婉', this)" class="tone-btn text-xs bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 py-2 rounded-lg transition font-medium">謙遜委婉</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STEP 3: 畫布元件操作器 -->
+            <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-5 space-y-4 backdrop-blur-sm">
+                <h2 class="text-sm font-semibold tracking-wider text-violet-400 uppercase flex items-center gap-2">
+                    <span class="bg-violet-500/20 text-violet-400 w-5 h-5 rounded-full inline-flex items-center justify-center text-xs">2</span>
+                    畫布元件配置器
+                </h2>
+                <p class="text-xs text-slate-400">在右側畫布上設計實體結構。點擊下方按鈕可在畫布中央快速追加客製化文書元件：</p>
+                
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="addNode('主旨/標題', '#6366f1')" class="flex items-center justify-center gap-2 text-xs bg-indigo-950/40 hover:bg-indigo-900/40 border border-indigo-800/60 text-indigo-300 py-2.5 px-3 rounded-xl transition font-medium">
+                        <span>＋ 主旨標題區</span>
+                    </button>
+                    <button onclick="addNode('說明/核心事實', '#8b5cf6')" class="flex items-center justify-center gap-2 text-xs bg-violet-950/40 hover:bg-violet-900/40 border border-violet-800/60 text-violet-300 py-2.5 px-3 rounded-xl transition font-medium">
+                        <span>＋ 說明與事实</span>
+                    </button>
+                    <button onclick="addNode('變動/對照點', '#ec4899')" class="flex items-center justify-center gap-2 text-xs bg-pink-950/40 hover:bg-pink-900/40 border border-pink-800/60 text-pink-300 py-2.5 px-3 rounded-xl transition font-medium">
+                        <span>＋ 變動對照表</span>
+                    </button>
+                    <button onclick="addNode('行動指引 (CTA)', '#f59e0b')" class="flex items-center justify-center gap-2 text-xs bg-amber-950/40 hover:bg-amber-900/40 border border-amber-800/60 text-amber-300 py-2.5 px-3 rounded-xl transition font-medium">
+                        <span>＋ 行動指引區</span>
+                    </button>
+                    <button onclick="addNode('備註/例外處置', '#10b981')" class="flex items-center justify-center gap-2 text-xs bg-emerald-950/40 hover:bg-emerald-900/40 border border-emerald-800/60 text-emerald-300 py-2.5 px-3 rounded-xl transition font-medium">
+                        <span>＋ 備註說明區</span>
+                    </button>
+                    <button onclick="addNode('簽署與聯絡', '#64748b')" class="flex items-center justify-center gap-2 text-xs bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700 text-slate-300 py-2.5 px-3 rounded-xl transition font-medium">
+                        <span>＋ 簽署聯絡區</span>
+                    </button>
+                </div>
+
+                <div class="border-t border-slate-800 pt-3 flex items-center justify-between">
+                    <span class="text-xs text-slate-400">畫布連線模式：</span>
+                    <button id="arrowModeBtn" onclick="toggleArrowMode()" class="text-xs bg-slate-900 border border-slate-800 hover:border-violet-500 text-slate-300 px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-slate-500" id="arrowIndicator"></span>
+                        <span>啟用節點連線</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 點選快速載入範本 -->
+            <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-5 space-y-3 backdrop-blur-sm">
+                <span class="text-xs font-semibold text-slate-400 tracking-wider uppercase block">快填範本與畫布佈局</span>
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="loadTemplatePreset('email')" class="text-xs bg-slate-900 hover:bg-indigo-950/40 border border-slate-800 hover:border-indigo-500/60 text-slate-300 px-3 py-2 rounded-lg transition">📧 截止日提醒信</button>
+                    <button onclick="loadTemplatePreset('announcement')" class="text-xs bg-slate-900 hover:bg-indigo-950/40 border border-slate-800 hover:border-indigo-500/60 text-slate-300 px-3 py-2 rounded-lg transition">📢 制度變更公告</button>
+                    <button onclick="loadTemplatePreset('sop')" class="text-xs bg-slate-900 hover:bg-indigo-950/40 border border-slate-800 hover:border-indigo-500/60 text-slate-300 px-3 py-2 rounded-lg transition">📝 操作 SOP 流程</button>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- 右側主要工作台 (占 8 欄) -->
+        <section class="xl:col-span-8 flex flex-col gap-6">
+            
+            <!-- 互動式 Canvas 畫布區區塊 -->
+            <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 flex flex-col flex-1 min-h-[400px]">
+                <div class="flex flex-wrap items-center justify-between pb-3 border-b border-slate-800 gap-3">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-indigo-500 animate-ping"></span>
+                        <h3 class="text-sm font-semibold text-slate-200">Interactive Canvas 結構畫布</h3>
+                        <span class="text-[10px] text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">支援拖曳與雙擊修改</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="clearCanvas()" class="text-xs bg-red-950/30 hover:bg-red-950/60 border border-red-900/40 text-red-300 px-3 py-1.5 rounded-lg transition">清空畫布</button>
+                        <button onclick="exportCanvasToImage()" class="text-xs bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 px-3 py-1.5 rounded-lg transition flex items-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+                            </svg>
+                            <span>匯出圖檔</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Canvas 本體容器 -->
+                <div class="canvas-container flex-1 rounded-xl mt-3 overflow-hidden border border-slate-800 relative min-h-[250px] cursor-grab active:cursor-grabbing">
+                    <canvas id="docCanvas" class="block w-full h-full"></canvas>
+                </div>
+                <div class="text-[11px] text-slate-400 mt-2 flex justify-between">
+                    <span>💡 操作提示：1. 按住拖曳可搬移區塊 | 2. 雙擊區塊可更換內容或刪除 | 3. 啟用連線後，點擊A區塊再點擊B區塊即可畫上連線。</span>
+                </div>
+            </div>
+
+            <!-- AI PROMPT 產出面板 -->
+            <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-5 space-y-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="text-emerald-400">⚡</span>
+                        <h3 class="text-sm font-semibold text-slate-200">已生成的 AI 高階提示詞（Prompt）</h3>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="compileAndGenerate()" class="text-xs bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-medium px-4 py-2 rounded-lg hover:from-indigo-500 hover:to-violet-500 shadow-md transition">編譯並生成 Prompt</button>
+                        <button onclick="copyGeneratedPrompt()" class="text-xs bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 px-3 py-2 rounded-lg transition">複製 Prompt</button>
+                    </div>
+                </div>
+
+                <textarea id="promptOutput" rows="6" readonly placeholder="請填妥設定並在畫布布排結構後，點擊「編譯並生成 Prompt」..." class="w-full bg-slate-900/80 border border-slate-800 rounded-xl p-4 text-xs font-mono text-slate-300 placeholder-slate-600 focus:outline-none focus:border-indigo-500 leading-relaxed transition"></textarea>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- 1. 雙擊編輯節點模態框 -->
+    <div id="editModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl">
+            <h3 class="text-md font-bold text-slate-100 mb-4 flex items-center gap-2">
+                <span class="text-indigo-400">✏</span> 編輯區塊屬性
+            </h3>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-2">區塊名稱/內容說明</label>
+                    <textarea id="modalNodeText" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"></textarea>
+                </div>
+                
+                <div>
+                    <label class="block text-xs text-slate-400 mb-2">區塊顏色</label>
+                    <div class="flex gap-2">
+                        <button onclick="setModalColor('#6366f1')" class="w-8 h-8 rounded-full border border-slate-800" style="background-color: #6366f1;"></button>
+                        <button onclick="setModalColor('#8b5cf6')" class="w-8 h-8 rounded-full border border-slate-800" style="background-color: #8b5cf6;"></button>
+                        <button onclick="setModalColor('#ec4899')" class="w-8 h-8 rounded-full border border-slate-800" style="background-color: #ec4899;"></button>
+                        <button onclick="setModalColor('#f59e0b')" class="w-8 h-8 rounded-full border border-slate-800" style="background-color: #f59e0b;"></button>
+                        <button onclick="setModalColor('#10b981')" class="w-8 h-8 rounded-full border border-slate-800" style="background-color: #10b981;"></button>
+                        <button onclick="setModalColor('#64748b')" class="w-8 h-8 rounded-full border border-slate-800" style="background-color: #64748b;"></button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-2 mt-6">
+                <button onclick="saveModalChanges()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 rounded-xl transition text-sm">儲存變更</button>
+                <button onclick="deleteSelectedNode()" class="bg-red-950 hover:bg-red-900 text-red-200 border border-red-800 font-medium px-4 py-2 rounded-xl transition text-sm">刪除此節點</button>
+                <button onclick="closeModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium px-4 py-2 rounded-xl transition text-sm">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. 全域通知 Toast 組件 -->
+    <div id="toastNotification" class="fixed bottom-6 right-6 bg-slate-950 border border-slate-800 text-slate-200 px-4 py-3 rounded-xl shadow-2xl z-50 flex items-center gap-2 transform translate-y-20 opacity-0 transition duration-300">
+        <span class="text-indigo-400" id="toastIcon">✨</span>
+        <span id="toastMessage" class="text-xs font-medium">這是通知訊息</span>
+    </div>
+
+    <!-- 3. 使用說明模態框 -->
+    <div id="helpModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl p-6 shadow-2xl">
+            <h3 class="text-md font-bold text-slate-100 mb-4 flex items-center gap-2">
+                <span class="text-indigo-400">📖</span> 行政文書 Canvas 畫布操作指南
+            </h3>
+            <div class="space-y-3 text-xs text-slate-300 leading-relaxed overflow-y-auto max-h-[400px]">
+                <p>本工具是一套**高階視覺化 Prompt 開發器**，其目的並非直接幫你寫完文章，而是讓你像拼圖一樣，把公務行政文書的**邏輯與順序**排列出來，讓 AI 照著排。以下是三大核心功能使用指南：</p>
+                <div class="border-l-2 border-indigo-500 pl-3">
+                    <strong class="text-indigo-300 block">第一步：自訂文書背景</strong>
+                    <p>選擇你的文書種類（如公告、信函、SOP），填入關鍵資訊。這個資訊將決定 AI 寫作的具體依據。</p>
+                </div>
+                <div class="border-l-2 border-violet-500 pl-3">
+                    <strong class="text-violet-300 block">第二步：畫布結構視覺排版</strong>
+                    <ul class="list-disc pl-4 space-y-1">
+                        <li>點擊「新增主旨區/行動指引」等按鈕可在畫布中心生成節點。</li>
+                        <li><b>滑鼠拖曳：</b>自由分配區塊排版順序（例如：標題放最上，簽章放最下）。</li>
+                        <li><b>雙擊編輯：</b>雙擊區塊可改寫成對應的變數佔位符，或者微調顏色、進行刪除。</li>
+                        <li><b>連線工具：</b>啟用連線後，點擊A節點再點擊B節點，可畫上一道連線箭頭，告訴 AI 這個文書有先後閱讀流程。</li>
+                    </ul>
+                </div>
+                <div class="border-l-2 border-emerald-500 pl-3">
+                    <strong class="text-emerald-300 block">第三步：編譯匯出</strong>
+                    <p>按下「編譯並生成 Prompt」，系統將依照**你在畫布上的排版順序 (由上至下)**與**連線關係**，全自動組裝生成 AI Prompt，複製後餵給 GPTs 即可高水準產出文書！</p>
+                </div>
+            </div>
+            <button onclick="closeHelpModal()" class="w-full mt-6 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium py-2 rounded-xl transition text-sm">我理解了</button>
+        </div>
+    </div>
+
+    <!-- Canvas 核心驅動腳本 -->
+    <script>
+        // 畫布基本設定
+        const canvas = document.getElementById('docCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = canvas.parentElement;
+
+        let shapes = [];
+        let connections = [];
+        
+        let selectedShape = null;
+        let isDragging = false;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
+        
+        // 連線模式專用狀態
+        let arrowMode = false;
+        let connectionStartShape = null;
+
+        // 當前編輯中模態框暫存
+        let activeEditShape = null;
+        let activeToneText = '正式精準';
+
+        // 初始化與響應式畫布大小調節
+        function initCanvas() {
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            draw();
+        }
+
+        window.addEventListener('resize', initCanvas);
+        window.onload = function() {
+            initCanvas();
+            loadTemplatePreset('email'); // 預載一個精美的跟進截止提醒模組
+        };
+
+        // 核心渲染迴圈
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 1. 繪製連線關係 (箭頭)
+            connections.forEach(conn => {
+                const from = shapes.find(s => s.id === conn.from);
+                const to = shapes.find(s => s.id === conn.to);
+                if (from && to) {
+                    drawArrow(from.x + from.w / 2, from.y + from.h / 2, to.x + to.w / 2, to.y + to.h / 2);
+                }
+            });
+
+            // 2. 繪製節點元素
+            shapes.forEach(shape => {
+                ctx.save();
+                
+                // 陰影特效
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+                ctx.shadowBlur = 10;
+                ctx.shadowOffsetY = 4;
+
+                // 邊緣高亮
+                if (selectedShape && selectedShape.id === shape.id) {
+                    ctx.strokeStyle = '#a5b4fc';
+                    ctx.lineWidth = 3;
+                } else {
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                    ctx.lineWidth = 1;
+                }
+
+                // 繪製圓角矩形
+                ctx.fillStyle = shape.color;
+                drawRoundedRect(ctx, shape.x, shape.y, shape.w, shape.h, 12);
+                ctx.fill();
+                ctx.stroke();
+                
+                // 繪製文字內容
+                ctx.restore();
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '600 12px Inter, "Noto Sans TC"';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                // 文字長度截斷或折行
+                wrapText(ctx, shape.text, shape.x + shape.w / 2, shape.y + shape.h / 2, shape.w - 20, 16);
+            });
+        }
+
+        // 圓角矩形輔助繪製函式
+        function drawRoundedRect(context, x, y, width, height, radius) {
+            context.beginPath();
+            context.moveTo(x + radius, y);
+            context.lineTo(x + width - radius, y);
+            context.quadraticCurveTo(x + width, y, x + width, y + radius);
+            context.lineTo(x + width, y + height - radius);
+            context.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            context.lineTo(x + radius, y + height);
+            context.quadraticCurveTo(x, y + height, x, y + height - radius);
+            context.lineTo(x, y + radius);
+            context.quadraticCurveTo(x, y, x + radius, y);
+            context.closePath();
+        }
+
+        // 文字折行渲染引擎
+        function wrapText(context, text, x, y, maxWidth, lineHeight) {
+            const words = text.split('');
+            let line = '';
+            let lines = [];
+
+            for (let n = 0; n < words.length; n++) {
+                let testLine = line + words[n];
+                let metrics = context.measureText(testLine);
+                let testWidth = metrics.width;
+                if (testWidth > maxWidth && n > 0) {
+                    lines.push(line);
+                    line = words[n];
+                } else {
+                    line = testLine;
+                }
+            }
+            lines.push(line);
+
+            let startY = y - ((lines.length - 1) * lineHeight) / 2;
+            for (let i = 0; i < lines.length; i++) {
+                context.fillText(lines[i], x, startY + (i * lineHeight));
+            }
+        }
+
+        // 繪製指向箭頭演算法
+        function drawArrow(fromx, fromy, tox, toy) {
+            const headlen = 10; // 箭頭頭部大小
+            const dx = tox - fromx;
+            const dy = toy - fromy;
+            const angle = Math.atan2(dy, dx);
+            
+            // 計算端點收縮，使箭頭不被節點圓角遮蔽
+            const padding = 45;
+            const targetX = tox - padding * Math.cos(angle);
+            const targetY = toy - padding * Math.sin(angle);
+            const startX = fromx + padding * Math.cos(angle);
+            const startY = fromy + padding * Math.sin(angle);
+
+            ctx.save();
+            ctx.strokeStyle = '#818cf8';
+            ctx.fillStyle = '#818cf8';
+            ctx.lineWidth = 2.5;
+
+            // 繪製連線
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(targetX, targetY);
+            ctx.stroke();
+
+            // 繪製箭頭三角面
+            ctx.beginPath();
+            ctx.moveTo(targetX, targetY);
+            ctx.lineTo(targetX - headlen * Math.cos(angle - Math.PI / 6), targetY - headlen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(targetX - headlen * Math.cos(angle + Math.PI / 6), targetY - headlen * Math.sin(angle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // 節點新增函式
+        function addNode(name, color, customX = null, customY = null) {
+            const defaultX = customX !== null ? customX : (canvas.width / 2) - 60;
+            const defaultY = customY !== null ? customY : (canvas.height / 2) - 25;
+            
+            const newNode = {
+                id: 'node_' + Date.now() + Math.random().toString(36).substr(2, 5),
+                x: defaultX,
+                y: defaultY,
+                w: 130,
+                h: 55,
+                text: name,
+                color: color
+            };
+            shapes.push(newNode);
+            draw();
+            showToast("成功添加新區塊: " + name, "🎨");
+        }
+
+        // 觸發連線模式開關
+        function toggleArrowMode() {
+            arrowMode = !arrowMode;
+            const btn = document.getElementById('arrowModeBtn');
+            const ind = document.getElementById('arrowIndicator');
+            if (arrowMode) {
+                btn.classList.add('border-violet-500', 'bg-violet-950/20');
+                ind.classList.replace('bg-slate-500', 'bg-violet-500');
+                showToast("連線模式已啟用：請依序點擊起點與終點區塊", "🔌");
+            } else {
+                btn.classList.remove('border-violet-500', 'bg-violet-950/20');
+                ind.classList.replace('bg-violet-500', 'bg-slate-500');
+                connectionStartShape = null;
+            }
+        }
+
+        // 清空重設
+        function clearCanvas() {
+            shapes = [];
+            connections = [];
+            selectedShape = null;
+            connectionStartShape = null;
+            draw();
+            showToast("畫布已清空", "🧹");
+        }
+
+        // 檢查游標點擊了哪個圖形
+        function getShapeAt(x, y) {
+            for (let i = shapes.length - 1; i >= 0; i--) {
+                const s = shapes[i];
+                if (x >= s.x && x <= s.x + s.w && y >= s.y && y <= s.y + s.h) {
+                    return s;
+                }
+            }
+            return null;
+        }
+
+        // 事件監聽
+        canvas.addEventListener('mousedown', function(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            const target = getShapeAt(x, y);
+
+            if (arrowMode) {
+                if (target) {
+                    if (!connectionStartShape) {
+                        connectionStartShape = target;
+                        showToast(`已選定起點「${target.text}」，請選定下一個終點`, "🔌");
+                    } else if (connectionStartShape.id !== target.id) {
+                        // 防重複連線
+                        const duplicate = connections.some(c => c.from === connectionStartShape.id && c.to === target.id);
+                        if (!duplicate) {
+                            connections.push({
+                                from: connectionStartShape.id,
+                                to: target.id
+                            });
+                            showToast(`已連結：${connectionStartShape.text} ➔ ${target.text}`, "🎯");
+                        }
+                        connectionStartShape = null;
+                        draw();
+                    }
+                }
+                return;
+            }
+
+            if (target) {
+                selectedShape = target;
+                isDragging = true;
+                dragOffsetX = x - target.x;
+                dragOffsetY = y - target.y;
+                
+                // 把拖曳中的移到最上層
+                shapes = shapes.filter(s => s.id !== target.id);
+                shapes.push(target);
+                
+                draw();
+            } else {
+                selectedShape = null;
+                draw();
+            }
+        });
+
+        canvas.addEventListener('mousemove', function(e) {
+            if (!isDragging || !selectedShape || arrowMode) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            // 限制邊界內拖移
+            selectedShape.x = Math.max(10, Math.min(canvas.width - selectedShape.w - 10, x - dragOffsetX));
+            selectedShape.y = Math.max(10, Math.min(canvas.height - selectedShape.h - 10, y - dragOffsetY));
+            draw();
+        });
+
+        canvas.addEventListener('mouseup', function() {
+            isDragging = false;
+        });
+
+        canvas.addEventListener('mouseleave', function() {
+            isDragging = false;
+        });
+
+        // 支援觸控（行動裝置）
+        canvas.addEventListener('touchstart', function(e) {
+            if (e.touches.length > 0) {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.touches[0].clientX - rect.left;
+                const y = e.touches[0].clientY - rect.top;
+                const target = getShapeAt(x, y);
+                if (target) {
+                    selectedShape = target;
+                    isDragging = true;
+                    dragOffsetX = x - target.x;
+                    dragOffsetY = y - target.y;
+                    draw();
+                }
+            }
+        });
+
+        canvas.addEventListener('touchmove', function(e) {
+            if (!isDragging || !selectedShape || e.touches.length === 0) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = e.touches[0].clientX - rect.left;
+            const y = e.touches[0].clientY - rect.top;
+            selectedShape.x = Math.max(10, Math.min(canvas.width - selectedShape.w - 10, x - dragOffsetX));
+            selectedShape.y = Math.max(10, Math.min(canvas.height - selectedShape.h - 10, y - dragOffsetY));
+            draw();
+            e.preventDefault();
+        });
+
+        canvas.addEventListener('touchend', function() {
+            isDragging = false;
+        });
+
+        // 雙擊開啟編輯模式
+        canvas.addEventListener('dblclick', function(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const target = getShapeAt(x, y);
+
+            if (target) {
+                activeEditShape = target;
+                document.getElementById('modalNodeText').value = target.text;
+                document.getElementById('editModal').classList.remove('hidden');
+            }
+        });
+
+        // 模態框操作邏輯
+        function closeModal() {
+            document.getElementById('editModal').classList.add('hidden');
+            activeEditShape = null;
+        }
+
+        function setModalColor(color) {
+            if (activeEditShape) {
+                activeEditShape.color = color;
+                draw();
+            }
+        }
+
+        function saveModalChanges() {
+            if (activeEditShape) {
+                activeEditShape.text = document.getElementById('modalNodeText').value.trim() || '無文字';
+                draw();
+                closeModal();
+                showToast("區塊屬性已更新", "✍");
+            }
+        }
+
+        function deleteSelectedNode() {
+            if (activeEditShape) {
+                const idToDelete = activeEditShape.id;
+                // 刪除該節點
+                shapes = shapes.filter(s => s.id !== idToDelete);
+                // 同時剪除與該節點關聯的所有連線
+                connections = connections.filter(c => c.from !== idToDelete && c.to !== idToDelete);
+                draw();
+                closeModal();
+                showToast("已成功刪除該文書區塊與關聯線條", "🗑");
+            }
+        }
+
+        // 使用說明視窗開關
+        function showHelpModal() {
+            document.getElementById('helpModal').classList.remove('hidden');
+        }
+        function closeHelpModal() {
+            document.getElementById('helpModal').classList.add('hidden');
+        }
+
+        // 全域通知系統 Toast
+        function showToast(message, icon = '✨') {
+            const toast = document.getElementById('toastNotification');
+            document.getElementById('toastIcon').innerText = icon;
+            document.getElementById('toastMessage').innerText = message;
+            
+            toast.classList.remove('opacity-0', 'translate-y-20');
+            toast.classList.add('opacity-100', 'translate-y-0');
+
+            setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', 'translate-y-20');
+            }, 3000);
+        }
+
+        // 文風切換處理
+        function setTone(tone, btnElement) {
+            activeToneText = tone;
+            document.querySelectorAll('.tone-btn').forEach(btn => {
+                btn.classList.remove('bg-indigo-600', 'border-indigo-500', 'text-white');
+                btn.classList.add('bg-slate-900', 'border-slate-800', 'text-slate-300');
+            });
+            btnElement.classList.replace('bg-slate-900', 'bg-indigo-600');
+            btnElement.classList.replace('border-slate-800', 'border-indigo-500');
+            btnElement.classList.replace('text-slate-300', 'text-white');
+            showToast(`已切換文風為：「${tone}」`, "🎭");
+        }
+
+        // 文書類型切換
+        function onDocTypeChange() {
+            const selected = document.getElementById('docTypeSelect').value;
+            showToast(`文書類型切換為「${selected}」，可點擊下方載入推薦範本！`, "📝");
+        }
+
+        // 快速預設佈局與資訊快填
+        function loadTemplatePreset(type) {
+            clearCanvas();
+            const w = canvas.width || 600;
+            const h = canvas.height || 400;
+
+            if (type === 'email') {
+                document.getElementById('docTypeSelect').value = '商務 Email';
+                document.getElementById('docContext').value = "各位主管：新產品研發專案進度即將在下週五 (5/22) 進入第一階段截止，目前尚有 A 與 C 兩組功能架構未更新進度，請於本週五前上線填寫進度表。";
+                
+                // 佈置畫布節點
+                addNode('主旨: [截止通知] 專案階段截止提醒', '#6366f1', w * 0.1, h * 0.1);
+                addNode('開頭: 親愛的主管與專案負責人', '#6366f1', w * 0.1, h * 0.35);
+                addNode('核心: 專案 5/22 第一階段截止提醒', '#8b5cf6', w * 0.5, h * 0.1);
+                addNode('具體行動: 週五前至系統填寫 A/C 進度', '#f59e0b', w * 0.5, h * 0.35);
+                addNode('署名: 專案管理處 PM 敬啟', '#64748b', w * 0.5, h * 0.65);
+
+                // 設定關聯線條
+                setTimeout(() => {
+                    if(shapes.length >= 5) {
+                        connections.push({from: shapes[0].id, to: shapes[1].id});
+                        connections.push({from: shapes[1].id, to: shapes[2].id});
+                        connections.push({from: shapes[2].id, to: shapes[3].id});
+                        connections.push({from: shapes[3].id, to: shapes[4].id});
+                        draw();
+                    }
+                }, 200);
+
+            } else if (type === 'announcement') {
+                document.getElementById('docTypeSelect').value = '內部公告';
+                document.getElementById('docContext').value = "由於公司搬遷與伺服器機房升級，本週六 (5/16) 早上 9:00 至下午 18:00 公司內部網路與 VPN 將暫停服務，當日無法進行遠端加班報審。";
+                
+                addNode('主旨: 本週六內部網路暫停服務公告', '#ec4899', w * 0.1, h * 0.2);
+                addNode('背景說明: 本週六機房搬遷與升級', '#8b5cf6', w * 0.1, h * 0.5);
+                addNode('受影響範圍: VPN、內部網、加班系統', '#ec4899', w * 0.5, h * 0.1);
+                addNode('替代因應方案: 請提前於週五前送審加班', '#f59e0b', w * 0.5, h * 0.4);
+                addNode('落款: 資訊技術部 敬上', '#64748b', w * 0.5, h * 0.7);
+
+                setTimeout(() => {
+                    if(shapes.length >= 5) {
+                        connections.push({from: shapes[0].id, to: shapes[1].id});
+                        connections.push({from: shapes[1].id, to: shapes[2].id});
+                        connections.push({from: shapes[2].id, to: shapes[3].id});
+                        connections.push({from: shapes[3].id, to: shapes[4].id});
+                        draw();
+                    }
+                }, 200);
+
+            } else if (type === 'sop') {
+                document.getElementById('docTypeSelect').value = '操作 SOP';
+                document.getElementById('docContext').value = "為防範勒索軟體，建立一套新進人員辦公電腦的資安防禦 SOP：1. 啟動 Windows Defender 全機掃描、2. 更改初始高複雜度密碼、3. 設定定期備份雲端硬碟。";
+                
+                addNode('起手式: 新進同仁資安防禦步驟 SOP', '#10b981', w * 0.1, h * 0.1);
+                addNode('步驟 1: 啟動 Windows 防毒全機掃描', '#10b981', w * 0.1, h * 0.5);
+                addNode('步驟 2: 修改初始密碼 (需12字)', '#8b5cf6', w * 0.5, h * 0.15);
+                addNode('步驟 3: 設定公司雲端備份排程', '#f59e0b', w * 0.5, h * 0.5);
+
+                setTimeout(() => {
+                    if(shapes.length >= 4) {
+                        connections.push({from: shapes[0].id, to: shapes[1].id});
+                        connections.push({from: shapes[1].id, to: shapes[2].id});
+                        connections.push({from: shapes[2].id, to: shapes[3].id});
+                        draw();
+                    }
+                }, 200);
+            }
+        }
+
+        // 智慧編譯：將 Canvas 的拓樸排版與設定編譯成極致的 Prompt 
+        function compileAndGenerate() {
+            const docType = document.getElementById('docTypeSelect').value;
+            const contextText = document.getElementById('docContext').value.trim();
+            
+            if (!contextText) {
+                showToast("請填寫左側的關鍵背景資訊！", "⚠️");
+                return;
+            }
+
+            if (shapes.length === 0) {
+                showToast("畫布上沒有節點！請在畫布放置至少一個結構元素。", "⚠️");
+                return;
+            }
+
+            // 1. 將畫布上的節點依照垂直 Y 軸坐標排序 (由上而下即為預設文書視覺順序)
+            const sortedShapes = [...shapes].sort((a, b) => {
+                if (Math.abs(a.y - b.y) < 30) {
+                    return a.x - b.x; // Y相近時看X
+                }
+                return a.y - b.y;
+            });
+
+            // 2. 爬梳關聯連線關係
+            let logicFlow = "";
+            if (connections.length > 0) {
+                logicFlow = "【節點閱讀流向 (Flowchart)】：\n";
+                connections.forEach((c, idx) => {
+                    const fromNode = shapes.find(s => s.id === c.from);
+                    const toNode = shapes.find(s => s.id === c.to);
+                    if (fromNode && toNode) {
+                        logicFlow += `${idx + 1}. [${fromNode.text}] ➔ 指引至 ➔ [${toNode.text}]\n`;
+                    }
+                });
+            } else {
+                logicFlow = "（未設定特定方向，預設依排版順序生成）\n";
+            }
+
+            // 3. 組成區塊說明
+            let blockStructures = "";
+            sortedShapes.forEach((shape, i) => {
+                blockStructures += `  - 區塊 ${i + 1}: ${shape.text} (其為 ${shape.text.split(':')[0]} 屬性，請在此安排相關內容與佔位符)\n`;
+            });
+
+            // 4. 對應文風的限制提示
+            let styleRules = "";
+            if (activeToneText === "正式精準") {
+                styleRules = "字句務實，不講官腔，結構嚴整不囉唆，專業而可信赖。";
+            } else if (activeToneText === "親切有溫度") {
+                styleRules = "充滿同理心與人性關懷，避免生硬官樣文章，多用溫和肯定字句。";
+            } else if (activeToneText === "簡潔俐落") {
+                styleRules = "句子短小精悍，排除一切冗字，重點直接條列化，務求 30 秒內過目難忘。";
+            } else if (activeToneText === "謙遜委婉") {
+                styleRules = "態度真摯恭敬，言辭修潤婉轉，若涉婉拒或調整，也務求顧全大局，留有轉圜。";
+            }
+
+            // 5. 輸出整套精緻 Prompt
+            const compiledPrompt = `【角色】
+你是精通職場高效溝通、格式排版卓越的「行政文書專家與 Prompt 架構工程師」。
+
+【任務】
+請根據下方的【背景資訊】與【畫布文書結構拓撲】，為我產出一份「${docType}」的【行政文書模板庫】。
+為了便於未來在多重行政場合重用，除特定背景外，請將所有會依狀況變動的「特定變數（日期、姓名、專案名等）」一律以 [方括號佔位符] 進行標記（例如：[截止日期]、[同仁姓名]）。
+
+【背景資訊】
+${contextText}
+
+【畫布文書結構拓撲（我希望你在模板中必須依序並緊密遵循的結構配置）】
+以下是我在視覺化 Canvas 畫布中對這篇文書排定的順序與流程架構：
+${blockStructures}
+${logicFlow}
+
+【限制與規格】
+1. 語氣文風：必須高度落實「${activeToneText}」—— ${styleRules}
+2. 模板要求：不只是單一不可修改的範文，而是要結構分層完美、能直接複製再編輯的高通用性模板。
+3. 全文請直接輸出文書模板本身，不添加任何 AI 與使用者的寒暄開場白或事後自我解析。
+
+【輸出格式】
+直接輸出符合上方畫布架構設計的「${docType} 模板」主體內容，文字排版需優雅、段落與留白得當。`;
+
+            document.getElementById('promptOutput').value = compiledPrompt;
+            showToast("AI Prompt 編譯完成！可以複製了。", "🚀");
+        }
+
+        // 複製 Prompt
+        function copyGeneratedPrompt() {
+            const area = document.getElementById('promptOutput');
+            if (!area.value) {
+                showToast("尚無內容可供複製，請先點擊「編譯並生成 Prompt」！", "⚠️");
+                return;
+            }
+            area.select();
+            document.execCommand('copy');
+            showToast("Prompt 已順利複製到剪貼簿！", "📋");
+        }
+
+        // 將 Canvas 匯出成圖片下載
+        function exportCanvasToImage() {
+            // 由於使用的是 Dark/Light 配色，我們在匯出時主動繪製一個漂亮的漸層底色
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = canvas.width;
+            tempCanvas.height = canvas.height;
+
+            // 1. 繪製深色底色與漸層
+            const gradient = tempCtx.createLinearGradient(0, 0, tempCanvas.width, tempCanvas.height);
+            gradient.addColorStop(0, '#0f172a');
+            gradient.addColorStop(1, '#020617');
+            tempCtx.fillStyle = gradient;
+            tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+            // 2. 繪製輔助微弱格線
+            tempCtx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            tempCtx.lineWidth = 1;
+            for (let x = 0; x < tempCanvas.width; x += 20) {
+                tempCtx.beginPath();
+                tempCtx.moveTo(x, 0);
+                tempCtx.lineTo(x, tempCanvas.height);
+                tempCtx.stroke();
+            }
+            for (let y = 0; y < tempCanvas.height; y += 20) {
+                tempCtx.beginPath();
+                tempCtx.moveTo(0, y);
+                tempCtx.lineTo(tempCanvas.width, y);
+                tempCtx.stroke();
+            }
+
+            // 3. 繪製線條
+            connections.forEach(conn => {
+                const from = shapes.find(s => s.id === conn.from);
+                const to = shapes.find(s => s.id === conn.to);
+                if (from && to) {
+                    const headlen = 10;
+                    const dx = to.x + to.w/2 - (from.x + from.w/2);
+                    const dy = to.y + to.h/2 - (from.y + from.h/2);
+                    const angle = Math.atan2(dy, dx);
+                    
+                    const padding = 45;
+                    const targetX = (to.x + to.w/2) - padding * Math.cos(angle);
+                    const targetY = (to.y + to.h/2) - padding * Math.sin(angle);
+                    const startX = (from.x + from.w/2) + padding * Math.cos(angle);
+                    const startY = (from.y + from.h/2) + padding * Math.sin(angle);
+
+                    tempCtx.save();
+                    tempCtx.strokeStyle = '#818cf8';
+                    tempCtx.fillStyle = '#818cf8';
+                    tempCtx.lineWidth = 3;
+
+                    tempCtx.beginPath();
+                    tempCtx.moveTo(startX, startY);
+                    tempCtx.lineTo(targetX, targetY);
+                    tempCtx.stroke();
+
+                    tempCtx.beginPath();
+                    tempCtx.moveTo(targetX, targetY);
+                    tempCtx.lineTo(targetX - headlen * Math.cos(angle - Math.PI/6), targetY - headlen * Math.sin(angle - Math.PI/6));
+                    tempCtx.lineTo(targetX - headlen * Math.cos(angle + Math.PI/6), targetY - headlen * Math.sin(angle + Math.PI/6));
+                    tempCtx.closePath();
+                    tempCtx.fill();
+                    tempCtx.restore();
+                }
+            });
+
+            // 4. 繪製節點
+            shapes.forEach(shape => {
+                tempCtx.save();
+                tempCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+                tempCtx.shadowBlur = 15;
+                tempCtx.shadowOffsetY = 6;
+
+                tempCtx.fillStyle = shape.color;
+                tempCtx.beginPath();
+                const radius = 12;
+                tempCtx.moveTo(shape.x + radius, shape.y);
+                tempCtx.lineTo(shape.x + shape.w - radius, shape.y);
+                tempCtx.quadraticCurveTo(shape.x + shape.w, shape.y, shape.x + shape.w, shape.y + radius);
+                tempCtx.lineTo(shape.x + shape.w, shape.y + shape.h - radius);
+                tempCtx.quadraticCurveTo(shape.x + shape.w, shape.y + shape.h, shape.x + shape.w - radius, shape.y + shape.h);
+                tempCtx.lineTo(shape.x + radius, shape.y + shape.h);
+                tempCtx.quadraticCurveTo(shape.x, shape.y + shape.h, shape.x, shape.y + shape.h - radius);
+                tempCtx.lineTo(shape.x, shape.y + radius);
+                tempCtx.quadraticCurveTo(shape.x, shape.y, shape.x + radius, shape.y);
+                tempCtx.closePath();
+                tempCtx.fill();
+                tempCtx.restore();
+
+                tempCtx.fillStyle = '#ffffff';
+                tempCtx.font = 'bold 12px Inter, Arial';
+                tempCtx.textAlign = 'center';
+                tempCtx.textBaseline = 'middle';
+                
+                // 折行繪製
+                const words = shape.text.split('');
+                let line = '';
+                let lines = [];
+                const maxW = shape.w - 20;
+                for (let n = 0; n < words.length; n++) {
+                    let testLine = line + words[n];
+                    let metrics = tempCtx.measureText(testLine);
+                    if (metrics.width > maxW && n > 0) {
+                        lines.push(line);
+                        line = words[n];
+                    } else {
+                        line = testLine;
+                    }
+                }
+                lines.push(line);
+                let startY = (shape.y + shape.h/2) - ((lines.length - 1) * 16) / 2;
+                for (let i = 0; i < lines.length; i++) {
+                    tempCtx.fillText(lines[i], shape.x + shape.w/2, startY + (i * 16));
+                }
+            });
+
+            // 匯出為 PNG 
+            const dataURL = tempCanvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = `文書結構Canvas-${Date.now()}.png`;
+            link.href = dataURL;
+            link.click();
+            showToast("畫布架構圖已成功存入本機！", "📸");
+        }
+    </script>
+</body>
+</html>
